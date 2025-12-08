@@ -1,0 +1,10 @@
+# w2/.dockerignore
+*/bin/
+*/dist/
+*/.env
+*/node_modules/
+**/.git/
+**/.DS_Store
+# go.work needed for Docker build
+# go.work
+# go.work.sum

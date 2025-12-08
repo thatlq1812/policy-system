@@ -1,0 +1,47 @@
+syntax = "proto3";
+package user;
+option go_package = "github.com/thatlq1812/policy-system/shared/pkg/api/user";
+
+// User represents a user in the system
+message User {
+    string id = 1;
+    string phone_number = 2;
+    string name = 3;
+    string platform_role = 4; // "Client" or "Merchant"
+    int64 created_at = 5;
+    int64 updated_at = 6;
+}
+
+// RegisterRequest for user registration
+message RegisterRequest {
+    string phone_number = 1;
+    string password = 2;
+    string name = 3;
+    string platform_role = 4; 
+}
+
+// RegisterResponse returns created user and JWT token
+message RegisterResponse {
+    User user = 1;
+    string token = 2; // Co the phan chia thanh access token va refresh token sau nay
+}
+
+// LoginRequest for user authentication
+message LoginRequest {
+    string phone_number = 1;
+    string password = 2;
+}
+
+// LoginResponse return user info and JWT token
+message LoginResponse {
+    User user = 1;
+    string token = 2;
+}
+
+
+
+// UserService handles user authentication and management
+service UserService {
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc Login(LoginRequest) returns (LoginResponse);
+}

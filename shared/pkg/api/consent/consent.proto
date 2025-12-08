@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package consent;
+
+option go_package = "github.com/thatlq1812/policy-system/shared/pkg/api/consent";
+
+// Service definition
+service ConsentService {
+  // Lưu đồng ý mới (single hoặc bulk)
+  rpc RecordConsent(RecordConsentRequest) returns (RecordConsentResponse);
+  
+  // Check user đã đồng ý document/version chưa
+  rpc CheckConsent(CheckConsentRequest) returns (CheckConsentResponse);
+  
+  // Lấy tất cả consents của user
+  rpc GetUserConsents(GetUserConsentsRequest) returns (GetUserConsentsResponse);
+  
+  // Check policies nào user chưa consent (pending)
+  rpc CheckPendingConsents(CheckPendingConsentsRequest) returns (CheckPendingConsentsResponse);
+  
+  // Soft delete consent (revoke)
+  rpc RevokeConsent(RevokeConsentRequest) returns (RevokeConsentResponse);
+}
+
+// Messages
+message Consent {
+  string id = 1;
+  string user_id = 2;
+  string platform = 3;
+  string document_id = 4;
+  string document_name = 5;
+  int64 version_timestamp = 6;
+  int64 agreed_at = 7; // Unix timestamp
+  string agreed_file_url = 8;
+  string consent_method = 9;
+  string ip_address = 10;
+  string user_agent = 11;
+  bool is_deleted = 12;
+  int64 deleted_at = 13;
+  int64 created_at = 14;
+  int64 updated_at = 15;
+}
+
+message ConsentInput {
+  string document_id = 1;
+  string document_name = 2;
+  int64 version_timestamp = 3;
+  string agreed_file_url = 4; // Optional
+}
+
+// RecordConsent - Lưu đồng ý mới
+message RecordConsentRequest {
+  string user_id = 1;
+  string platform = 2;
+  repeated ConsentInput consents = 3; // Bulk consent
+  string consent_method = 4; // 'REGISTRATION', 'UI', 'API'
+  string ip_address = 5; // Optional
+  string user_agent = 6; // Optional
+}
+
+message RecordConsentResponse {
+  repeated Consent consents = 1;
+  int32 total_recorded = 2;
+}
+
+// CheckConsent - Check user đã consent chưa
+message CheckConsentRequest {
+  string user_id = 1;
+  string document_id = 2;
+  int64 min_version_timestamp = 3; // Check >= version này
+}
+
+message CheckConsentResponse {
+  bool has_consented = 1;
+  Consent latest_consent = 2; // null nếu chưa consent
+}
+
+// GetUserConsents - Lấy tất cả consents của user
+message GetUserConsentsRequest {
+  string user_id = 1;
+  bool include_deleted = 2; // Default false
+}
+
+message GetUserConsentsResponse {
+  repeated Consent consents = 1;
+  int32 total = 2;
+}
+
+// CheckPendingConsents - Check policies nào chưa consent
+message PendingPolicy {
+  string document_id = 1;
+  string document_name = 2;
+  int64 version_timestamp = 3;
+  string platform = 4;
+}
+
+message CheckPendingConsentsRequest {
+  string user_id = 1;
+  string platform = 2;
+  repeated PendingPolicy latest_policies = 3; // Gateway truyền vào
+}
+
+message CheckPendingConsentsResponse {
+  repeated PendingPolicy pending_policies = 1;
+  bool requires_consent = 2;
+}
+
+// RevokeConsent - Soft delete consent
+message RevokeConsentRequest {
+  string user_id = 1;
+  string document_id = 2;
+  int64 version_timestamp = 3;
+}
+
+message RevokeConsentResponse {
+  bool success = 1;
+  string message = 2;
+}

@@ -1,0 +1,151 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Server (shared)
+  postgres:
+    restart: unless-stopped
+    image: postgres:18-alpine
+    container_name: policy_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres # Default DB
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - policy_network
+
+  # Document Service
+  document_service:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: document/Dockerfile
+    container_name: document_service
+    environment:
+      GRPC_PORT: 50051
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/document_db?sslmode=disable
+      DB_MAX_CONN: 10
+    ports:
+      - "50051:50051"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # Document migrate:
+  document_migrate:
+    restart: no
+    image: migrate/migrate
+    container_name: document_migrate
+    volumes:
+      - ./document/migrations:/migrations
+    command: [ "-path", "/migrations", "-database", "postgres://postgres:postgres@postgres:5432/document_db?sslmode=disable", "up" ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # User Service
+  user_service:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: user/Dockerfile
+    container_name: user_service
+    env_file:
+      - user/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/user_db?sslmode=disable
+    ports:
+      - "50052:50052"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # User migrate:
+  user_migrate:
+    restart: no
+    image: migrate/migrate
+    container_name: user_migrate
+    volumes:
+      - ./user/migrations:/migrations
+    command: [ "-path", "/migrations", "-database", "postgres://postgres:postgres@postgres:5432/user_db?sslmode=disable", "up" ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # Consent Service
+  consent_service:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: consent/Dockerfile
+    container_name: consent_service
+    env_file:
+      - consent/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable
+    ports:
+      - "50053:50053"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # Consent migrate
+  consent_migrate:
+    restart: no
+    image: migrate/migrate
+    container_name: consent_migrate
+    volumes:
+      - ./consent/migrations:/migrations
+    command: [ "-path", "/migrations", "-database", "postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable", "up" ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+  # API Gateway
+  gateway:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: api_gateway
+    environment:
+      SERVER_PORT: 8080
+      USER_SERVICE_ADDR: user_service:50052
+      DOCUMENT_SERVICE_ADDR: document_service:50051
+      CONSENT_SERVICE_ADDR: consent_service:50053
+    ports:
+      - "8080:8080"
+    depends_on:
+      - user_service
+      - document_service
+      - consent_service
+    networks:
+      - policy_network
+
+volumes:
+  postgres_data:
+
+
+networks:
+  policy_network:
+    driver: bridge
