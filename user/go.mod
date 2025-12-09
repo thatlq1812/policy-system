@@ -7,12 +7,13 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
-	github.com/thatlq1812/policy-system/shared v0.0.0-00010101000000-000000000000
+	github.com/thatlq1812/policy-system/shared v0.1.0
 	golang.org/x/crypto v0.45.0
 	google.golang.org/grpc v1.77.0
 )
 
-replace github.com/thatlq1812/policy-system/shared => ../shared
+// During local development you can restore the replace below to use the local shared module.
+// replace github.com/thatlq1812/policy-system/shared => ../shared
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect

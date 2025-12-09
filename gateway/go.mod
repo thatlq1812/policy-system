@@ -3,11 +3,11 @@ module github.com/thatlq1812/policy-system/gateway
 go 1.25.4
 
 require (
-	github.com/thatlq1812/policy-system/shared v0.0.0-00010101000000-000000000000
+	github.com/thatlq1812/policy-system/shared v0.1.0
 	google.golang.org/grpc v1.77.0
 )
 
-replace github.com/thatlq1812/policy-system/shared => ../shared
+// replace github.com/thatlq1812/policy-system/shared => ../shared
 
 require (
 	golang.org/x/net v0.47.0 // indirect

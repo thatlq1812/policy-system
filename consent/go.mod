@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/joho/godotenv v1.5.1
-	github.com/thatlq1812/policy-system/shared v0.0.0-00010101000000-000000000000
+	github.com/thatlq1812/policy-system/shared v0.1.0
 	google.golang.org/grpc v1.77.0
 )
 
@@ -22,4 +22,6 @@ require (
 	google.golang.org/protobuf v1.36.10 // indirect
 )
 
-replace github.com/thatlq1812/policy-system/shared => ../shared
+// In production/when consumed via go proxy, modules will use the released tag `shared/v0.1.0`.
+// During local development you can uncomment the replace below to point to the local copy.
+// replace github.com/thatlq1812/policy-system/shared => ../shared
