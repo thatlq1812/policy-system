@@ -15,45 +15,59 @@ import (
 // UserService defines business operations for users
 type UserService interface {
 	Register(ctx context.Context, phoneNumber, password, name, platformRole string) (*domain.User, string, error)
+
 	Login(ctx context.Context, phoneNumber, password string) (*domain.User, string, error)
+
+	// RefreshToken generates new access token from valid refresh token
+	RefreshToken(ctx context.Context, refreshToken string) (string, int64, error)
+
+	// Logout revokes a refresh token
+	Logout(ctx context.Context, refreshToken string) error
 }
 
 // userService implements UserService
 type userService struct {
-	repo           repository.UserRepository
-	jwtSecret      string
-	jwtExpiryHours int
+	repo             repository.UserRepository
+	refreshTokenRepo repository.RefreshTokenRepository // NEW
+	jwtSecret        string
+	jwtExpiryHours   int // Deprecated, use constants in token_helpers.go
 }
 
 // NewUserService creates a new service instance
-func NewUserService(repo repository.UserRepository, jwtSecret string, jwtExpiryHours int) UserService {
+func NewUserService(
+	repo repository.UserRepository,
+	refreshTokenRepo repository.RefreshTokenRepository, // NEW
+	jwtSecret string,
+	jwtExpiryHours int,
+) UserService {
 	return &userService{
-		repo:           repo,
-		jwtSecret:      jwtSecret,
-		jwtExpiryHours: jwtExpiryHours,
+		repo:             repo,
+		refreshTokenRepo: refreshTokenRepo,
+		jwtSecret:        jwtSecret,
+		jwtExpiryHours:   jwtExpiryHours,
 	}
 }
 
-// Register creates a new user with hashed password
-func (s *userService) Register(ctx context.Context, phoneNumber, password, name, platformRole string) (*domain.User, string, error) {
+// Register creates a new user with dual token authentication
+func (s *userService) Register(ctx context.Context, phoneNumber, password, name, platformRole string) (*domain.User, string, string, int64, int64, error) {
 	// 1. Validate input
 	if err := s.validateRegisterInput(phoneNumber, password, platformRole); err != nil {
-		return nil, "", fmt.Errorf("validation failed: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("validation failed: %w", err)
 	}
 
 	// 2. Check if user already exists
 	existingUser, err := s.repo.GetByPhoneNumber(ctx, phoneNumber)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to check existing user: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("failed to check existing user: %w", err)
 	}
 	if existingUser != nil {
-		return nil, "", fmt.Errorf("user with phone number %s already exists", phoneNumber)
+		return nil, "", "", 0, 0, fmt.Errorf("user with phone number %s already exists", phoneNumber)
 	}
 
 	// 3. Hash password
 	passwordHash, err := s.hashPassword(password)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to hash password: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("failed to hash password: %w", err)
 	}
 
 	// 4. Create user in database
@@ -64,46 +78,135 @@ func (s *userService) Register(ctx context.Context, phoneNumber, password, name,
 		PlatformRole: platformRole,
 	})
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to create user: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// 5. Generate JWT token
-	token, err := s.generateJWT(user.ID, user.PlatformRole)
+	// 5. Generate access token
+	accessToken, accessExpiresAt, err := s.generateAccessToken(user.ID, user.PlatformRole)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to generate token: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	return user, token, nil
+	// 6. Generate and store refresh token
+	refreshToken := s.generateRefreshToken()
+	refreshTokenHash := s.hashToken(refreshToken)
+	refreshExpiresAt := time.Now().Add(RefreshTokenExpiry)
+
+	_, err = s.refreshTokenRepo.Create(ctx, domain.CreateRefreshTokenParams{
+		UserID:     user.ID,
+		TokenHash:  refreshTokenHash,
+		ExpiresAt:  refreshExpiresAt,
+		DeviceInfo: "registration", // TODO: Extract from context/metadata
+		IPAddress:  "",             // TODO: Extract from context/metadata
+	})
+	if err != nil {
+		return nil, "", "", 0, 0, fmt.Errorf("failed to store refresh token: %w", err)
+	}
+
+	return user, accessToken, refreshToken, accessExpiresAt, refreshExpiresAt.Unix(), nil
 }
 
-// Login authenticates user and returns JWT token
-func (s *userService) Login(ctx context.Context, phoneNumber, password string) (*domain.User, string, error) {
+// Login authenticates user and returns dual tokens
+func (s *userService) Login(ctx context.Context, phoneNumber, password string) (*domain.User, string, string, int64, int64, error) {
 	// 1. Validate input
 	if phoneNumber == "" || password == "" {
-		return nil, "", fmt.Errorf("phone number and password are required")
+		return nil, "", "", 0, 0, fmt.Errorf("phone number and password are required")
 	}
 
 	// 2. Get user by phone number
 	user, err := s.repo.GetByPhoneNumber(ctx, phoneNumber)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get user: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("failed to get user: %w", err)
 	}
 	if user == nil {
-		return nil, "", fmt.Errorf("invalid credentials")
+		return nil, "", "", 0, 0, fmt.Errorf("invalid credentials")
 	}
 
 	// 3. Verify password
 	if err := s.verifyPassword(user.PasswordHash, password); err != nil {
-		return nil, "", fmt.Errorf("invalid credentials")
+		return nil, "", "", 0, 0, fmt.Errorf("invalid credentials")
 	}
 
-	// 4. Generate JWT token
-	token, err := s.generateJWT(user.ID, user.PlatformRole)
+	// 4. Generate access token
+	accessToken, accessExpiresAt, err := s.generateAccessToken(user.ID, user.PlatformRole)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to generate token: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	return user, token, nil
+	// 5. Generate and store refresh token
+	refreshToken := s.generateRefreshToken()
+	refreshTokenHash := s.hashToken(refreshToken)
+	refreshExpiresAt := time.Now().Add(RefreshTokenExpiry)
+
+	_, err = s.refreshTokenRepo.Create(ctx, domain.CreateRefreshTokenParams{
+		UserID:     user.ID,
+		TokenHash:  refreshTokenHash,
+		ExpiresAt:  refreshExpiresAt,
+		DeviceInfo: "login", // TODO: Extract from context/metadata
+		IPAddress:  "",      // TODO: Extract from context/metadata
+	})
+	if err != nil {
+		return nil, "", "", 0, 0, fmt.Errorf("failed to store refresh token: %w", err)
+	}
+
+	return user, accessToken, refreshToken, accessExpiresAt, refreshExpiresAt.Unix(), nil
+}
+
+// RefreshToken generates new access token from valid refresh token
+func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (string, int64, error) {
+	// 1. Hash the provided refresh token
+	tokenHash := s.hashToken(refreshToken)
+
+	// 2. Get refresh token from database
+	storedToken, err := s.refreshTokenRepo.GetByTokenHash(ctx, tokenHash)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get refresh token: %w", err)
+	}
+	if storedToken == nil {
+		return "", 0, fmt.Errorf("invalid refresh token")
+	}
+
+	// 3. Verify token is valid (not revoked, not expired)
+	if !storedToken.IsValid() {
+		if storedToken.IsRevoked() {
+			return "", 0, fmt.Errorf("refresh token has been revoked")
+		}
+		return "", 0, fmt.Errorf("refresh token has expired")
+	}
+
+	// 4. Get user to retrieve platform_role for new access token
+	user, err := s.repo.GetByID(ctx, storedToken.UserID)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to get user: %w", err)
+	}
+	if user == nil {
+		return "", 0, fmt.Errorf("user not found")
+	}
+
+	// 5. Generate new access token
+	accessToken, accessExpiresAt, err := s.generateAccessToken(user.ID, user.PlatformRole)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	// TODO: Optional - Token rotation (generate new refresh token and revoke old one)
+	// This improves security but adds DB write on every refresh
+
+	return accessToken, accessExpiresAt, nil
+}
+
+// Logout revokes a refresh token
+func (s *userService) Logout(ctx context.Context, refreshToken string) error {
+	// 1. Hash the refresh token
+	tokenHash := s.hashToken(refreshToken)
+
+	// 2. Revoke the token in database
+	err := s.refreshTokenRepo.Revoke(ctx, tokenHash, "user_logout")
+	if err != nil {
+		return fmt.Errorf("failed to revoke refresh token: %w", err)
+	}
+
+	return nil
 }
 
 // validateRegisterInput validates registration parameters

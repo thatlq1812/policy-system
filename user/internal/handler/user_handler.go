@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,15 +23,10 @@ func NewUserHandler(service service.UserService) *UserHandler {
 	return &UserHandler{service: service}
 }
 
-// Register handles user registration
+// Register creates a new user account with dual token authentication
 func (h *UserHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	// Step 1: Validate request
-	if err := h.validateRegisterRequest(req); err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	// Step 2: Call service layer
-	user, token, err := h.service.Register(
+	// Call service layer
+	user, accessToken, refreshToken, accessExpiresAt, refreshExpiresAt, err := h.service.Register(
 		ctx,
 		req.PhoneNumber,
 		req.Password,
@@ -38,13 +34,23 @@ func (h *UserHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 		req.PlatformRole,
 	)
 	if err != nil {
-		return nil, mapErrorToGRPCStatus(err)
+		// Map errors to gRPC status codes
+		if strings.Contains(err.Error(), "validation") {
+			return nil, status.Errorf(codes.InvalidArgument, "validation failed: %v", err)
+		}
+		if strings.Contains(err.Error(), "already exists") {
+			return nil, status.Errorf(codes.AlreadyExists, "user already exists: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to register user: %v", err)
 	}
 
-	// Step 3: Convert domain to protobuf and return
+	// Convert domain to proto
 	return &pb.RegisterResponse{
-		User:  domainUserToPb(user),
-		Token: token,
+		User:                  domainToProto(user),
+		AccessToken:           accessToken,
+		RefreshToken:          refreshToken,
+		AccessTokenExpiresAt:  accessExpiresAt,
+		RefreshTokenExpiresAt: refreshExpiresAt,
 	}, nil
 }
 

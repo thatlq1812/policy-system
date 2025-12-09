@@ -2,6 +2,14 @@ syntax = "proto3";
 package user;
 option go_package = "github.com/thatlq1812/policy-system/shared/pkg/api/user";
 
+// UserService handles user authentication and management
+service UserService {
+    rpc Register(RegisterRequest) returns (RegisterResponse);
+    rpc Login(LoginRequest) returns (LoginResponse);
+    rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
+    rpc Logout(LogoutRequest) returns (LogoutResponse);
+}
+
 // User represents a user in the system
 message User {
     string id = 1;
@@ -23,7 +31,11 @@ message RegisterRequest {
 // RegisterResponse returns created user and JWT token
 message RegisterResponse {
     User user = 1;
-    string token = 2; // Co the phan chia thanh access token va refresh token sau nay
+    // Token system
+    string access_token = 2;
+    string refresh_token = 3;
+    int64 access_token_expires_at = 4; // Unix timestamp
+    int64 refresh_token_expires_at = 5; // Unix timestamp
 }
 
 // LoginRequest for user authentication
@@ -35,13 +47,32 @@ message LoginRequest {
 // LoginResponse return user info and JWT token
 message LoginResponse {
     User user = 1;
-    string token = 2;
+    string access_token = 2;
+    string refresh_token = 3;
+    int64 access_token_expires_at = 4; // Unix timestamp
+    int64 refresh_token_expires_at = 5; // Unix timestamp
 }
 
+// ReqfreshTokenRequest - Client sends refresh token to get new access token
+message RefreshTokenRequest {
+    string refresh_token = 1;
+}
 
+// RefreshTokenResponse - Server returns new access token and refresh token
+message RefreshTokenResponse {
+    string access_token = 1;
+    string refresh_token = 2;
+    int64 access_token_expires_at = 3; // Unix timestamp
+    int64 refresh_token_expires_at = 4; // Unix timestamp
+}
 
-// UserService handles user authentication and management
-service UserService {
-    rpc Register(RegisterRequest) returns (RegisterResponse);
-    rpc Login(LoginRequest) returns (LoginResponse);
+// LogoutRequest - Client sends refresh token to logout
+message LogoutRequest {
+    string refresh_token = 1;
+}
+
+// LogoutResponse - Server confirms logout
+message LogoutResponse {
+    bool success = 1;
+    string message = 2;
 }

@@ -15,6 +15,7 @@ import (
 type UserRepository interface {
 	Create(ctx context.Context, params domain.CreateUserParams) (*domain.User, error)
 	GetByPhoneNumber(ctx context.Context, phoneNumber string) (*domain.User, error)
+	GetByID(ctx context.Context, userID string) (*domain.User, error)
 }
 
 // postgresUserRepository implements UserRepository using PostgreSQL
@@ -87,6 +88,35 @@ func (r *postgresUserRepository) GetByPhoneNumber(ctx context.Context, phoneNumb
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
+	}
+
+	return &user, nil
+}
+
+// GetByID retrieves a user by ID
+func (r *postgresUserRepository) GetByID(ctx context.Context, userID string) (*domain.User, error) {
+	query := `
+		SELECT id, phone_number, password_hash, name, platform_role, created_at, updated_at
+		FROM users
+		WHERE id = $1 AND is_deleted = FALSE
+	`
+
+	var user domain.User
+	err := r.db.QueryRow(ctx, query, userID).Scan(
+		&user.ID,
+		&user.PhoneNumber,
+		&user.PasswordHash,
+		&user.Name,
+		&user.PlatformRole,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err != nil {
+		if err.Error() == "no rows in result set" {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user by ID: %w", err)
 	}
 
 	return &user, nil
