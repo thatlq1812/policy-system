@@ -361,112 +361,6 @@ func (x *GetLatestPolicyResponse) GetDocument() *PolicyDocument {
 	return nil
 }
 
-// Request để show lịch sử cho admin
-type GetPolicyHistoryRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Platform      string                 `protobuf:"bytes,1,opt,name=platform,proto3" json:"platform,omitempty"`                             // "Client" hoặc "Merchant"
-	DocumentName  string                 `protobuf:"bytes,2,opt,name=document_name,json=documentName,proto3" json:"document_name,omitempty"` // Tên document
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetPolicyHistoryRequest) Reset() {
-	*x = GetPolicyHistoryRequest{}
-	mi := &file_pkg_api_document_document_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetPolicyHistoryRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetPolicyHistoryRequest) ProtoMessage() {}
-
-func (x *GetPolicyHistoryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_document_document_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetPolicyHistoryRequest.ProtoReflect.Descriptor instead.
-func (*GetPolicyHistoryRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_api_document_document_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *GetPolicyHistoryRequest) GetPlatform() string {
-	if x != nil {
-		return x.Platform
-	}
-	return ""
-}
-
-func (x *GetPolicyHistoryRequest) GetDocumentName() string {
-	if x != nil {
-		return x.DocumentName
-	}
-	return ""
-}
-
-// Response trả về lịch sử document
-type GetPolicyHistoryResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Documents     []*PolicyDocument      `protobuf:"bytes,1,rep,name=documents,proto3" json:"documents,omitempty"`                               // Danh sách các phiên bản
-	TotalVersions int32                  `protobuf:"varint,2,opt,name=total_versions,json=totalVersions,proto3" json:"total_versions,omitempty"` // Tổng số phiên bản của document
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *GetPolicyHistoryResponse) Reset() {
-	*x = GetPolicyHistoryResponse{}
-	mi := &file_pkg_api_document_document_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *GetPolicyHistoryResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*GetPolicyHistoryResponse) ProtoMessage() {}
-
-func (x *GetPolicyHistoryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_document_document_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use GetPolicyHistoryResponse.ProtoReflect.Descriptor instead.
-func (*GetPolicyHistoryResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_document_document_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *GetPolicyHistoryResponse) GetDocuments() []*PolicyDocument {
-	if x != nil {
-		return x.Documents
-	}
-	return nil
-}
-
-func (x *GetPolicyHistoryResponse) GetTotalVersions() int32 {
-	if x != nil {
-		return x.TotalVersions
-	}
-	return 0
-}
-
 // Request cho update operation
 type UpdatePolicyRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
@@ -485,7 +379,7 @@ type UpdatePolicyRequest struct {
 
 func (x *UpdatePolicyRequest) Reset() {
 	*x = UpdatePolicyRequest{}
-	mi := &file_pkg_api_document_document_proto_msgTypes[7]
+	mi := &file_pkg_api_document_document_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -497,7 +391,7 @@ func (x *UpdatePolicyRequest) String() string {
 func (*UpdatePolicyRequest) ProtoMessage() {}
 
 func (x *UpdatePolicyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_document_document_proto_msgTypes[7]
+	mi := &file_pkg_api_document_document_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -510,7 +404,7 @@ func (x *UpdatePolicyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePolicyRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePolicyRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_api_document_document_proto_rawDescGZIP(), []int{7}
+	return file_pkg_api_document_document_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdatePolicyRequest) GetDocumentName() string {
@@ -573,7 +467,7 @@ type UpdatePolicyResponse struct {
 
 func (x *UpdatePolicyResponse) Reset() {
 	*x = UpdatePolicyResponse{}
-	mi := &file_pkg_api_document_document_proto_msgTypes[8]
+	mi := &file_pkg_api_document_document_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -585,7 +479,7 @@ func (x *UpdatePolicyResponse) String() string {
 func (*UpdatePolicyResponse) ProtoMessage() {}
 
 func (x *UpdatePolicyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_document_document_proto_msgTypes[8]
+	mi := &file_pkg_api_document_document_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -598,7 +492,7 @@ func (x *UpdatePolicyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePolicyResponse.ProtoReflect.Descriptor instead.
 func (*UpdatePolicyResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_document_document_proto_rawDescGZIP(), []int{8}
+	return file_pkg_api_document_document_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdatePolicyResponse) GetDocument() *PolicyDocument {
@@ -647,13 +541,7 @@ const file_pkg_api_document_document_proto_rawDesc = "" +
 	"\bplatform\x18\x01 \x01(\tR\bplatform\x12#\n" +
 	"\rdocument_name\x18\x02 \x01(\tR\fdocumentName\"O\n" +
 	"\x17GetLatestPolicyResponse\x124\n" +
-	"\bdocument\x18\x01 \x01(\v2\x18.document.PolicyDocumentR\bdocument\"Z\n" +
-	"\x17GetPolicyHistoryRequest\x12\x1a\n" +
-	"\bplatform\x18\x01 \x01(\tR\bplatform\x12#\n" +
-	"\rdocument_name\x18\x02 \x01(\tR\fdocumentName\"y\n" +
-	"\x18GetPolicyHistoryResponse\x126\n" +
-	"\tdocuments\x18\x01 \x03(\v2\x18.document.PolicyDocumentR\tdocuments\x12%\n" +
-	"\x0etotal_versions\x18\x02 \x01(\x05R\rtotalVersions\"\x87\x02\n" +
+	"\bdocument\x18\x01 \x01(\v2\x18.document.PolicyDocumentR\bdocument\"\x87\x02\n" +
 	"\x13UpdatePolicyRequest\x12#\n" +
 	"\rdocument_name\x18\x01 \x01(\tR\fdocumentName\x12\x1a\n" +
 	"\bplatform\x18\x02 \x01(\tR\bplatform\x12!\n" +
@@ -665,12 +553,11 @@ const file_pkg_api_document_document_proto_rawDesc = "" +
 	"\x13effective_timestamp\x18\a \x01(\x03R\x12effectiveTimestamp\"f\n" +
 	"\x14UpdatePolicyResponse\x124\n" +
 	"\bdocument\x18\x01 \x01(\v2\x18.document.PolicyDocumentR\bdocument\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xf0\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\x95\x02\n" +
 	"\x0fDocumentService\x12Q\n" +
 	"\fCreatePolicy\x12\x1f.document.CreateDocumentRequest\x1a .document.CreateDocumentResponse\x12`\n" +
 	"\x19GetLatestPolicyByPlatform\x12 .document.GetLatestPolicyRequest\x1a!.document.GetLatestPolicyResponse\x12M\n" +
-	"\fUpdatePolicy\x12\x1d.document.UpdatePolicyRequest\x1a\x1e.document.UpdatePolicyResponse\x12Y\n" +
-	"\x10GetPolicyHistory\x12!.document.GetPolicyHistoryRequest\x1a\".document.GetPolicyHistoryResponseB=Z;github.com/thatlq1812/policy-system/shared/pkg/api/documentb\x06proto3"
+	"\fUpdatePolicy\x12\x1d.document.UpdatePolicyRequest\x1a\x1e.document.UpdatePolicyResponseB=Z;github.com/thatlq1812/policy-system/shared/pkg/api/documentb\x06proto3"
 
 var (
 	file_pkg_api_document_document_proto_rawDescOnce sync.Once
@@ -684,36 +571,31 @@ func file_pkg_api_document_document_proto_rawDescGZIP() []byte {
 	return file_pkg_api_document_document_proto_rawDescData
 }
 
-var file_pkg_api_document_document_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_pkg_api_document_document_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_pkg_api_document_document_proto_goTypes = []any{
-	(*PolicyDocument)(nil),           // 0: document.PolicyDocument
-	(*CreateDocumentRequest)(nil),    // 1: document.CreateDocumentRequest
-	(*CreateDocumentResponse)(nil),   // 2: document.CreateDocumentResponse
-	(*GetLatestPolicyRequest)(nil),   // 3: document.GetLatestPolicyRequest
-	(*GetLatestPolicyResponse)(nil),  // 4: document.GetLatestPolicyResponse
-	(*GetPolicyHistoryRequest)(nil),  // 5: document.GetPolicyHistoryRequest
-	(*GetPolicyHistoryResponse)(nil), // 6: document.GetPolicyHistoryResponse
-	(*UpdatePolicyRequest)(nil),      // 7: document.UpdatePolicyRequest
-	(*UpdatePolicyResponse)(nil),     // 8: document.UpdatePolicyResponse
+	(*PolicyDocument)(nil),          // 0: document.PolicyDocument
+	(*CreateDocumentRequest)(nil),   // 1: document.CreateDocumentRequest
+	(*CreateDocumentResponse)(nil),  // 2: document.CreateDocumentResponse
+	(*GetLatestPolicyRequest)(nil),  // 3: document.GetLatestPolicyRequest
+	(*GetLatestPolicyResponse)(nil), // 4: document.GetLatestPolicyResponse
+	(*UpdatePolicyRequest)(nil),     // 5: document.UpdatePolicyRequest
+	(*UpdatePolicyResponse)(nil),    // 6: document.UpdatePolicyResponse
 }
 var file_pkg_api_document_document_proto_depIdxs = []int32{
 	0, // 0: document.CreateDocumentResponse.document:type_name -> document.PolicyDocument
 	0, // 1: document.GetLatestPolicyResponse.document:type_name -> document.PolicyDocument
-	0, // 2: document.GetPolicyHistoryResponse.documents:type_name -> document.PolicyDocument
-	0, // 3: document.UpdatePolicyResponse.document:type_name -> document.PolicyDocument
-	1, // 4: document.DocumentService.CreatePolicy:input_type -> document.CreateDocumentRequest
-	3, // 5: document.DocumentService.GetLatestPolicyByPlatform:input_type -> document.GetLatestPolicyRequest
-	7, // 6: document.DocumentService.UpdatePolicy:input_type -> document.UpdatePolicyRequest
-	5, // 7: document.DocumentService.GetPolicyHistory:input_type -> document.GetPolicyHistoryRequest
-	2, // 8: document.DocumentService.CreatePolicy:output_type -> document.CreateDocumentResponse
-	4, // 9: document.DocumentService.GetLatestPolicyByPlatform:output_type -> document.GetLatestPolicyResponse
-	8, // 10: document.DocumentService.UpdatePolicy:output_type -> document.UpdatePolicyResponse
-	6, // 11: document.DocumentService.GetPolicyHistory:output_type -> document.GetPolicyHistoryResponse
-	8, // [8:12] is the sub-list for method output_type
-	4, // [4:8] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0, // 2: document.UpdatePolicyResponse.document:type_name -> document.PolicyDocument
+	1, // 3: document.DocumentService.CreatePolicy:input_type -> document.CreateDocumentRequest
+	3, // 4: document.DocumentService.GetLatestPolicyByPlatform:input_type -> document.GetLatestPolicyRequest
+	5, // 5: document.DocumentService.UpdatePolicy:input_type -> document.UpdatePolicyRequest
+	2, // 6: document.DocumentService.CreatePolicy:output_type -> document.CreateDocumentResponse
+	4, // 7: document.DocumentService.GetLatestPolicyByPlatform:output_type -> document.GetLatestPolicyResponse
+	6, // 8: document.DocumentService.UpdatePolicy:output_type -> document.UpdatePolicyResponse
+	6, // [6:9] is the sub-list for method output_type
+	3, // [3:6] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_pkg_api_document_document_proto_init() }
@@ -727,7 +609,7 @@ func file_pkg_api_document_document_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_api_document_document_proto_rawDesc), len(file_pkg_api_document_document_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

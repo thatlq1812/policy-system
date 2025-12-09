@@ -2,6 +2,12 @@ package domain
 
 import "time"
 
+// Platform constants - EXACT values accepted
+const (
+	PlatformClient   = "Client"
+	PlatformMerchant = "Merchant"
+)
+
 type PolicyDocument struct {
 	ID                 string    `db:"id"`
 	DocumentName       string    `db:"document_name"`
@@ -22,4 +28,9 @@ type CreateDocumentParams struct {
 	ContentHTML        string
 	FileURL            string
 	CreatedBy          string
+}
+
+// Helper function for validation
+func IsValidPlatform(platform string) bool {
+	return platform == PlatformClient || platform == PlatformMerchant
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"strings"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,17 +27,17 @@ func (h *DocumentHandler) CreatePolicy(ctx context.Context, req *pb.CreateDocume
 		DocumentName:       req.DocumentName,
 		Platform:           req.Platform,
 		IsMandatory:        req.IsMandatory,
-		EffectiveTimestamp: req.EffectiveTimestamp,
+		EffectiveTimestamp: req.EffectiveTimestamp, // Pass từ client, service sẽ handle nếu = 0
 		ContentHTML:        req.ContentHtml,
 		FileURL:            req.FileUrl,
-		CreatedBy:          req.CreatedBy,
+		CreatedBy:          req.CreatedBy, // UpdaedBy map sang CreatedBy vì create record mới
 	}
 
 	// Step 2: Call service layer
 	doc, err := h.service.CreatePolicy(ctx, params)
 	if err != nil {
 		// Step 3: Map errors to gRPC status codes
-		return nil, mapErrorToGRPCStatus(err)
+		return nil, mapErrorToGRPCStatus(err) // Dùng helper function đã có để map lỗi
 	}
 
 	// Step 4: Convert domain to protobuf
@@ -63,6 +64,32 @@ func (h *DocumentHandler) GetLatestPolicyByPlatform(ctx context.Context, req *pb
 	}, nil
 }
 
+func (h *DocumentHandler) UpdatePolicy(ctx context.Context, req *pb.UpdatePolicyRequest) (*pb.UpdatePolicyResponse, error) {
+	// Step 1: Convert protobuf to domain
+	params := domain.CreateDocumentParams{
+		DocumentName:       req.DocumentName,
+		Platform:           req.Platform,
+		IsMandatory:        req.IsMandatory,
+		EffectiveTimestamp: req.EffectiveTimestamp, // Pass từ client, service sẽ handle nếu = 0
+		ContentHTML:        req.ContentHtml,
+		FileURL:            req.FileUrl,
+		CreatedBy:          req.UpdatedBy, // UpdatedBy map sang CreatedBy vì create record mới
+	}
+
+	// Step 2: Call service layer
+	doc, err := h.service.UpdatePolicy(ctx, params)
+	if err != nil {
+		// Step 3: Map errors to gRPC status codes
+		return nil, mapErrorToGRPCStatus(err) // Dùng helper function đã có để map lỗi
+	}
+
+	// Step 4: Convert domain to protobuf
+	return &pb.UpdatePolicyResponse{
+		Document: domainToPb(doc), // Use helper function để convert có sẵn
+		Message:  "Policy document updated successfully. New version created.",
+	}, nil
+}
+
 // Helper: Convert domain model to protobuf message
 func domainToPb(doc *domain.PolicyDocument) *pb.PolicyDocument {
 	return &pb.PolicyDocument{
@@ -76,6 +103,38 @@ func domainToPb(doc *domain.PolicyDocument) *pb.PolicyDocument {
 		CreatedAt:          doc.CreatedAt.Unix(),
 		CreatedBy:          doc.CreatedBy,
 	}
+}
+
+// GetPolicyHistory retrieves the version history of a policy document
+func (h *DocumentHandler) GetPolicyHistory(ctx context.Context, req *pb.GetPolicyHistoryRequest) (*pb.GetPolicyHistoryResponse, error) {
+	documents, err := h.service.GetPolicyHistory(ctx, req.Platform, req.DocumentName)
+	if err != nil {
+		if strings.Contains(err.Error(), "validation") || strings.Contains(err.Error(), "required") {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid input: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "failed to get history: %v", err)
+	}
+
+	// Convert domain models to proto messages
+	pbDocument := make([]*pb.PolicyDocument, len(documents))
+	for i, doc := range documents {
+		pbDocument[i] = &pb.PolicyDocument{
+			Id:                 doc.ID,
+			DocumentName:       doc.DocumentName,
+			Platform:           doc.Platform,
+			IsMandatory:        doc.IsMandatory,
+			EffectiveTimestamp: doc.EffectiveTimestamp,
+			ContentHtml:        doc.ContentHTML,
+			FileUrl:            doc.FileURL,
+			CreatedAt:          doc.CreatedAt.Unix(),
+			CreatedBy:          doc.CreatedBy,
+		}
+	}
+
+	return &pb.GetPolicyHistoryResponse{
+		Documents:     pbDocument,
+		TotalVersions: int32(len(pbDocument)),
+	}, nil
 }
 
 // Helper: Map service errors to gRPC status codes

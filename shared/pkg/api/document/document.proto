@@ -2,6 +2,13 @@ syntax = "proto3";
 package document;
 option go_package = "github.com/thatlq1812/policy-system/shared/pkg/api/document";
 
+service DocumentService {
+    rpc CreatePolicy(CreateDocumentRequest) returns (CreateDocumentResponse);
+    rpc GetLatestPolicyByPlatform(GetLatestPolicyRequest) returns (GetLatestPolicyResponse);
+    rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse);
+    rpc GetPolicyHistory(GetPolicyHistoryRequest) returns (GetPolicyHistoryResponse);
+}
+
 message PolicyDocument {
     string id = 1;
     string document_name = 2;
@@ -37,7 +44,33 @@ message GetLatestPolicyResponse {
     PolicyDocument document = 1;
 }
 
-service DocumentService {
-    rpc CreatePolicy(CreateDocumentRequest) returns (CreateDocumentResponse);
-    rpc GetLatestPolicyByPlatform(GetLatestPolicyRequest) returns (GetLatestPolicyResponse);
+// Request để show lịch sử cho admin
+message GetPolicyHistoryRequest {
+    string platform = 1; // "Client" hoặc "Merchant"
+    string document_name = 2; // Tên document
+}
+
+// Response trả về lịch sử document
+message GetPolicyHistoryResponse {
+    repeated PolicyDocument documents = 1; // Danh sách các phiên bản
+    int32 total_versions = 2; // Tổng số phiên bản của document
+}
+
+// Request cho update operation
+message UpdatePolicyRequest {
+    string document_name = 1; // Ten document can update
+    string platform = 2; // "Client" hoac "Merchant"
+    bool is_mandatory = 3; // Co bat buoc khong
+    string content_html = 4; // Noi dung HTML moi
+    string file_url = 5; // URL file moi
+    string updated_by = 6; // UUID cua admin thuc hien update
+    // Timestamp (Unix epoch) mà Admin muốn chính sách bắt đầu có hiệu lực
+    // Nếu Admin không chọn (gửi 0), Backend sẽ tự lấy time.Now()
+    int64 effective_timestamp = 7;
+}
+
+// Response tra ve document moi duoc tao
+message UpdatePolicyResponse {
+    PolicyDocument document = 1; // Document voi effective_timestamp moi
+    string message = 2; // "Policy updated successfully. New version created."
 }
