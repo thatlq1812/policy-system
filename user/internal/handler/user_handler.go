@@ -232,13 +232,13 @@ func (h *UserHandler) UpdateUserProfile(ctx context.Context, req *pb.UpdateUserP
 	user, err := h.service.UpdateUserProfile(ctx, req.UserId, name, phoneNumber)
 	if err != nil {
 		if strings.Contains(err.Error(), "validation") {
-			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+			return nil, status.Errorf(codes.InvalidArgument, "%s", err.Error())
 		}
 		if strings.Contains(err.Error(), "already exists") {
-			return nil, status.Errorf(codes.AlreadyExists, err.Error())
+			return nil, status.Errorf(codes.AlreadyExists, "%s", err.Error())
 		}
 		if strings.Contains(err.Error(), "not found") {
-			return nil, status.Errorf(codes.NotFound, err.Error())
+			return nil, status.Errorf(codes.NotFound, "%s", err.Error())
 		}
 		return nil, status.Errorf(codes.Internal, "failed to update user profile: %v", err)
 	}
@@ -261,7 +261,7 @@ func (h *UserHandler) ChangePassword(ctx context.Context, req *pb.ChangePassword
 			return nil, status.Errorf(codes.Unauthenticated, "old password is incorrect")
 		}
 		if strings.Contains(err.Error(), "validation") {
-			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+			return nil, status.Errorf(codes.InvalidArgument, "%s", err.Error())
 		}
 		if strings.Contains(err.Error(), "not found") {
 			return nil, status.Errorf(codes.NotFound, "user not found")
@@ -360,7 +360,7 @@ func (h *UserHandler) UpdateUserRole(ctx context.Context, req *pb.UpdateUserRole
 	user, err := h.service.UpdateUserRole(ctx, req.UserId, req.NewPlatformRole)
 	if err != nil {
 		if strings.Contains(err.Error(), "validation") {
-			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+			return nil, status.Errorf(codes.InvalidArgument, "%s", err.Error())
 		}
 
 		if strings.Contains(err.Error(), "not found") {

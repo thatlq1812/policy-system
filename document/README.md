@@ -1,35 +1,51 @@
-# Document Service
+# Document Service - Policy Document Management
 
-Policy document management service for creating, versioning, and publishing documents using gRPC.
+Policy document management service for creating, versioning, and publishing documents.
+
+**Version:** 1.0.0 | **Status:** Production Ready | **Port:** 50051 (gRPC) | **Methods:** 4/4
+
+---
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Quick Start](#quick-start)
+3. [Environment Variables](#environment-variables)
+4. [Database Schema](#database-schema)
+5. [API Reference](#api-reference)
+6. [Testing Guide](#testing-guide)
+7. [Troubleshooting](#troubleshooting)
+
+---
 
 ## Overview
 
-**Port:** 50051  
-**Protocol:** gRPC  
-**Database:** PostgreSQL (document_db)  
-**Language:** Go 1.21+
+### Features
 
-## Architecture
+- Document creation and versioning
+- Document lifecycle management (Draft, Published, Archived)
+- Retrieval of latest policy by platform
+- Comprehensive policy history tracking
+
+### Architecture
 
 ```
 Client/Gateway
-    ↓
+    |
 Document Service (gRPC)
-    ↓
-PostgreSQL (document_db)
-    └── policy_documents table
+    |-- Service Layer (Business Logic)
+    |-- Repository Layer (Data Access)
+    +-- PostgreSQL Database
+        +-- policy_documents table
 ```
+
+---
 
 ## Quick Start
 
-### Prerequisites
-- Docker & Docker Compose
-- Go 1.21+ (for local development)
-- PostgreSQL 15+
-
-### Run with Docker
+### Run with Docker (Recommended)
 ```bash
-# From project root
+# From project root d:/w2
 docker-compose up -d document_service
 
 # Check logs
@@ -37,167 +53,143 @@ docker-compose logs -f document_service
 
 # Run migrations
 docker-compose up document_migrate
+
+# Verify service
+grpcurl -plaintext localhost:50051 list document.DocumentService
 ```
 
-### Run Locally
+### Run Locally (Development)
 ```bash
 cd document
 
 # Install dependencies
 go mod download
 
-# Set environment variables
-export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/document_db?sslmode=disable"
-export SERVER_PORT="50051"
+# Set environment variables (example .env)
+# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/document_db?sslmode=disable"
+# GRPC_PORT="50051"
 
 # Run service
 go run cmd/server/main.go
+
+# Or build binary
+go build -o bin/document cmd/server/main.go
+./bin/document
 ```
+
+---
+
+## Environment Variables
+| Variable       | Description                          | Default | Required |
+|----------------|--------------------------------------|---------|----------|
+| `DATABASE_URL` | PostgreSQL connection string         | -       | Yes      |
+| `GRPC_PORT`    | gRPC server port                     | `50051` | No       |
+
+---
 
 ## Database Schema
 
-### policy_documents
+### policy_documents table
 ```sql
-id              UUID PRIMARY KEY
-title           VARCHAR(255) NOT NULL
-content         TEXT NOT NULL
-version         INTEGER NOT NULL
-effective_date  DATE NOT NULL
-status          VARCHAR(50) NOT NULL     -- Draft | Published | Archived
-owner           VARCHAR(255)
-created_at      TIMESTAMP
-updated_at      TIMESTAMP
-is_deleted      BOOLEAN DEFAULT FALSE
+CREATE TABLE policy_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_name VARCHAR(255) NOT NULL,
+    platform VARCHAR(50) NOT NULL, -- Client | Merchant
+    is_mandatory BOOLEAN NOT NULL DEFAULT FALSE,
+    effective_timestamp BIGINT NOT NULL,
+    content_html TEXT NOT NULL,
+    file_url TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMP,
+    deleted_by VARCHAR(255),
+    is_latest BOOLEAN NOT NULL DEFAULT TRUE -- Indicates if this is the latest published version
+);
 
--- Unique constraint: one version per title
-UNIQUE(title, version)
+-- Unique index for active, latest policy documents
+CREATE UNIQUE INDEX idx_latest_active_policy 
+ON policy_documents (platform, document_name)
+WHERE is_deleted = FALSE AND is_latest = TRUE;
+
+-- Index for efficient history retrieval
+CREATE INDEX idx_policy_history 
+ON policy_documents (platform, document_name, effective_timestamp DESC);
 ```
 
-**Status Values:**
-- `Draft`: Document in progress, not visible to users
-- `Published`: Active document, visible to users
-- `Archived`: Old version, kept for history
+**Migrations:**
+- `000001_create_policy_documents_table.up.sql`
 
-## API Methods
+---
 
-### 1. CreateDocument
-**RPC:** `document.DocumentService/CreateDocument`
+## API Reference
 
-**Purpose:** Create new policy document (always starts as version 1, Draft status)
+### Available Methods (4 Total)
 
-**Request:**
-```json
-{
-  "title": "Privacy Policy",
-  "content": "This is the privacy policy content...",
-  "effective_date": "2025-01-01",
-  "owner": "user-uuid"
-}
+**Core Operations:**
 ```
-
-**Response:**
-```json
-{
-  "document": {
-    "id": "doc-uuid",
-    "title": "Privacy Policy",
-    "content": "This is the privacy policy content...",
-    "version": 1,
-    "effective_date": "2025-01-01",
-    "status": "Draft",
-    "owner": "user-uuid",
-    "created_at": "1733740800",
-    "updated_at": "1733740800"
-  }
-}
-```
-
-**Business Logic:**
-1. Check if document with same title already exists
-2. If exists → Return error (use UpdateDocument to create new version)
-3. If new → Create with version = 1, status = Draft
-4. Set created_at, updated_at = NOW()
-
-**Use Cases:**
-- Admin creates new policy document
-- System generates initial terms and conditions
-- First version of any policy document
-
-**Errors:**
-- `ALREADY_EXISTS`: Document with this title already exists
-- `INVALID_ARGUMENT`: Missing required fields
-- `INTERNAL`: Database error
-
-**Example:**
-```bash
-grpcurl -plaintext -d '{
-  "title": "Terms of Service",
-  "content": "You agree to these terms...",
-  "effective_date": "2025-01-01",
-  "owner": "admin-uuid"
-}' localhost:50051 document.DocumentService/CreateDocument
+document.DocumentService.CreatePolicy           - Create a new policy document
+document.DocumentService.GetLatestPolicyByPlatform  - Retrieve the latest published policy for a platform
+document.DocumentService.UpdatePolicy           - Create a new version of an existing policy
+document.DocumentService.GetPolicyHistory       - Retrieve all versions of a policy
 ```
 
 ---
 
-### 2. GetDocumentByID
-**RPC:** `document.DocumentService/GetDocumentByID`
+## Testing Guide
 
-**Purpose:** Get specific document by UUID (any version)
+### Using grpcurl
 
-**Request:**
-```json
-{
-  "id": "doc-uuid"
-}
-```
+To test the Document Service endpoints, ensure the service is running and use `grpcurl` from your terminal.
 
-**Response:**
-```json
-{
-  "document": {
-    "id": "doc-uuid",
-    "title": "Privacy Policy",
-    "content": "Full content...",
-    "version": 2,
-    "effective_date": "2025-02-01",
-    "status": "Published",
-    "owner": "admin-uuid",
-    "created_at": "timestamp",
-    "updated_at": "timestamp"
-  }
-}
-```
-
-**Business Logic:**
-1. Query by id WHERE is_deleted = FALSE
-2. Return document or NOT_FOUND
-
-**Use Cases:**
-- Get specific version for review
-- Display document details in admin panel
-- Audit trail lookup
-
-**Example:**
+**Example: CreatePolicy**
 ```bash
 grpcurl -plaintext -d '{
-  "id": "doc-uuid-here"
-}' localhost:50051 document.DocumentService/GetDocumentByID
+  "document_name": "Privacy Policy",
+  "platform": "Client",
+  "is_mandatory": true,
+  "effective_timestamp": 1678886400,
+  "content_html": "<p>New Privacy Policy Content</p>",
+  "created_by": "admin-user"
+}' localhost:50051 document.DocumentService/CreatePolicy
+```
+
+**Example: GetLatestPolicyByPlatform**
+```bash
+grpcurl -plaintext -d '{
+  "platform": "Client",
+  "document_name": "Privacy Policy"
+}' localhost:50051 document.DocumentService/GetLatestPolicyByPlatform
+```
+
+**Example: UpdatePolicy**
+```bash
+grpcurl -plaintext -d '{
+  "document_name": "Privacy Policy",
+  "platform": "Client",
+  "is_mandatory": true,
+  "effective_timestamp": 1700000000,
+  "content_html": "<p>Updated Privacy Policy Content</p>",
+  "created_by": "admin-user"
+}' localhost:50051 document.DocumentService/UpdatePolicy
+```
+
+**Example: GetPolicyHistory**
+```bash
+grpcurl -plaintext -d '{
+  "platform": "Client",
+  "document_name": "Privacy Policy"
+}' localhost:50051 document.DocumentService/GetPolicyHistory
 ```
 
 ---
 
-### 3. GetDocumentByTitle
-**RPC:** `document.DocumentService/GetDocumentByTitle`
+## Troubleshooting
 
-**Purpose:** Get latest published version of document by title
-
-**Request:**
-```json
-{
-  "title": "Privacy Policy"
-}
-```
+- **Service not starting:** Check `docker-compose logs document_service` for errors.
+- **Database connection issues:** Verify `DATABASE_URL` and PostgreSQL container status.
+- **Migration errors:** Ensure migrations are applied correctly with `docker-compose up document_migrate`.
 
 **Response:**
 ```json

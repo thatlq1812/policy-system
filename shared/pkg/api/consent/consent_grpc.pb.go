@@ -24,6 +24,8 @@ const (
 	ConsentService_GetUserConsents_FullMethodName      = "/consent.ConsentService/GetUserConsents"
 	ConsentService_CheckPendingConsents_FullMethodName = "/consent.ConsentService/CheckPendingConsents"
 	ConsentService_RevokeConsent_FullMethodName        = "/consent.ConsentService/RevokeConsent"
+	ConsentService_GetConsentHistory_FullMethodName    = "/consent.ConsentService/GetConsentHistory"
+	ConsentService_GetConsentStats_FullMethodName      = "/consent.ConsentService/GetConsentStats"
 )
 
 // ConsentServiceClient is the client API for ConsentService service.
@@ -42,6 +44,10 @@ type ConsentServiceClient interface {
 	CheckPendingConsents(ctx context.Context, in *CheckPendingConsentsRequest, opts ...grpc.CallOption) (*CheckPendingConsentsResponse, error)
 	// Soft delete consent (revoke)
 	RevokeConsent(ctx context.Context, in *RevokeConsentRequest, opts ...grpc.CallOption) (*RevokeConsentResponse, error)
+	// Phase 2: Get consent history for user+document
+	GetConsentHistory(ctx context.Context, in *GetConsentHistoryRequest, opts ...grpc.CallOption) (*GetConsentHistoryResponse, error)
+	// Phase 4: Get consent statistics
+	GetConsentStats(ctx context.Context, in *GetConsentStatsRequest, opts ...grpc.CallOption) (*GetConsentStatsResponse, error)
 }
 
 type consentServiceClient struct {
@@ -102,6 +108,26 @@ func (c *consentServiceClient) RevokeConsent(ctx context.Context, in *RevokeCons
 	return out, nil
 }
 
+func (c *consentServiceClient) GetConsentHistory(ctx context.Context, in *GetConsentHistoryRequest, opts ...grpc.CallOption) (*GetConsentHistoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetConsentHistoryResponse)
+	err := c.cc.Invoke(ctx, ConsentService_GetConsentHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *consentServiceClient) GetConsentStats(ctx context.Context, in *GetConsentStatsRequest, opts ...grpc.CallOption) (*GetConsentStatsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetConsentStatsResponse)
+	err := c.cc.Invoke(ctx, ConsentService_GetConsentStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConsentServiceServer is the server API for ConsentService service.
 // All implementations must embed UnimplementedConsentServiceServer
 // for forward compatibility.
@@ -118,6 +144,10 @@ type ConsentServiceServer interface {
 	CheckPendingConsents(context.Context, *CheckPendingConsentsRequest) (*CheckPendingConsentsResponse, error)
 	// Soft delete consent (revoke)
 	RevokeConsent(context.Context, *RevokeConsentRequest) (*RevokeConsentResponse, error)
+	// Phase 2: Get consent history for user+document
+	GetConsentHistory(context.Context, *GetConsentHistoryRequest) (*GetConsentHistoryResponse, error)
+	// Phase 4: Get consent statistics
+	GetConsentStats(context.Context, *GetConsentStatsRequest) (*GetConsentStatsResponse, error)
 	mustEmbedUnimplementedConsentServiceServer()
 }
 
@@ -142,6 +172,12 @@ func (UnimplementedConsentServiceServer) CheckPendingConsents(context.Context, *
 }
 func (UnimplementedConsentServiceServer) RevokeConsent(context.Context, *RevokeConsentRequest) (*RevokeConsentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevokeConsent not implemented")
+}
+func (UnimplementedConsentServiceServer) GetConsentHistory(context.Context, *GetConsentHistoryRequest) (*GetConsentHistoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetConsentHistory not implemented")
+}
+func (UnimplementedConsentServiceServer) GetConsentStats(context.Context, *GetConsentStatsRequest) (*GetConsentStatsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetConsentStats not implemented")
 }
 func (UnimplementedConsentServiceServer) mustEmbedUnimplementedConsentServiceServer() {}
 func (UnimplementedConsentServiceServer) testEmbeddedByValue()                        {}
@@ -254,6 +290,42 @@ func _ConsentService_RevokeConsent_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConsentService_GetConsentHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConsentHistoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConsentServiceServer).GetConsentHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConsentService_GetConsentHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConsentServiceServer).GetConsentHistory(ctx, req.(*GetConsentHistoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ConsentService_GetConsentStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetConsentStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConsentServiceServer).GetConsentStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConsentService_GetConsentStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConsentServiceServer).GetConsentStats(ctx, req.(*GetConsentStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConsentService_ServiceDesc is the grpc.ServiceDesc for ConsentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -280,6 +352,14 @@ var ConsentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevokeConsent",
 			Handler:    _ConsentService_RevokeConsent_Handler,
+		},
+		{
+			MethodName: "GetConsentHistory",
+			Handler:    _ConsentService_GetConsentHistory_Handler,
+		},
+		{
+			MethodName: "GetConsentStats",
+			Handler:    _ConsentService_GetConsentStats_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

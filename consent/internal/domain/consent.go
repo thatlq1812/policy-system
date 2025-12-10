@@ -16,7 +16,11 @@ type UserConsent struct {
 	IPAddress        *string    `db:"ip_address"` // Pointer for NULL
 	UserAgent        *string    `db:"user_agent"` // Pointer for NULL
 	IsDeleted        bool       `db:"is_deleted"`
-	DeletedAt        *time.Time `db:"deleted_at"` // Pointer for NULL
+	DeletedAt        *time.Time `db:"deleted_at"`     // Pointer for NULL
+	IsLatest         bool       `db:"is_latest"`      // NEW: Phase 2 - History tracking
+	RevokedAt        *time.Time `db:"revoked_at"`     // NEW: Phase 2 - Revocation time
+	RevokedReason    *string    `db:"revoked_reason"` // NEW: Phase 2 - Revocation reason
+	RevokedBy        *string    `db:"revoked_by"`     // NEW: Phase 2 - Who revoked
 	CreatedAt        time.Time  `db:"created_at"`
 	UpdatedAt        time.Time  `db:"updated_at"`
 }

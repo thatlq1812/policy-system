@@ -39,8 +39,13 @@ type Consent struct {
 	DeletedAt        int64                  `protobuf:"varint,13,opt,name=deleted_at,json=deletedAt,proto3" json:"deleted_at,omitempty"`
 	CreatedAt        int64                  `protobuf:"varint,14,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt        int64                  `protobuf:"varint,15,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Phase 2: History tracking fields
+	IsLatest      bool   `protobuf:"varint,16,opt,name=is_latest,json=isLatest,proto3" json:"is_latest,omitempty"`
+	RevokedAt     int64  `protobuf:"varint,17,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
+	RevokedReason string `protobuf:"bytes,18,opt,name=revoked_reason,json=revokedReason,proto3" json:"revoked_reason,omitempty"`
+	RevokedBy     string `protobuf:"bytes,19,opt,name=revoked_by,json=revokedBy,proto3" json:"revoked_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Consent) Reset() {
@@ -176,6 +181,34 @@ func (x *Consent) GetUpdatedAt() int64 {
 		return x.UpdatedAt
 	}
 	return 0
+}
+
+func (x *Consent) GetIsLatest() bool {
+	if x != nil {
+		return x.IsLatest
+	}
+	return false
+}
+
+func (x *Consent) GetRevokedAt() int64 {
+	if x != nil {
+		return x.RevokedAt
+	}
+	return 0
+}
+
+func (x *Consent) GetRevokedReason() string {
+	if x != nil {
+		return x.RevokedReason
+	}
+	return ""
+}
+
+func (x *Consent) GetRevokedBy() string {
+	if x != nil {
+		return x.RevokedBy
+	}
+	return ""
 }
 
 type ConsentInput struct {
@@ -895,11 +928,245 @@ func (x *RevokeConsentResponse) GetMessage() string {
 	return ""
 }
 
+// GetConsentHistory - Get all consent versions for user+document
+type GetConsentHistoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	DocumentId    string                 `protobuf:"bytes,2,opt,name=document_id,json=documentId,proto3" json:"document_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetConsentHistoryRequest) Reset() {
+	*x = GetConsentHistoryRequest{}
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConsentHistoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConsentHistoryRequest) ProtoMessage() {}
+
+func (x *GetConsentHistoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConsentHistoryRequest.ProtoReflect.Descriptor instead.
+func (*GetConsentHistoryRequest) Descriptor() ([]byte, []int) {
+	return file_pkg_api_consent_consent_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetConsentHistoryRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *GetConsentHistoryRequest) GetDocumentId() string {
+	if x != nil {
+		return x.DocumentId
+	}
+	return ""
+}
+
+type GetConsentHistoryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	History       []*Consent             `protobuf:"bytes,1,rep,name=history,proto3" json:"history,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetConsentHistoryResponse) Reset() {
+	*x = GetConsentHistoryResponse{}
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConsentHistoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConsentHistoryResponse) ProtoMessage() {}
+
+func (x *GetConsentHistoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConsentHistoryResponse.ProtoReflect.Descriptor instead.
+func (*GetConsentHistoryResponse) Descriptor() ([]byte, []int) {
+	return file_pkg_api_consent_consent_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *GetConsentHistoryResponse) GetHistory() []*Consent {
+	if x != nil {
+		return x.History
+	}
+	return nil
+}
+
+func (x *GetConsentHistoryResponse) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+// GetConsentStats - Get consent statistics
+type GetConsentStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Platform      string                 `protobuf:"bytes,1,opt,name=platform,proto3" json:"platform,omitempty"` // Optional: filter by platform
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetConsentStatsRequest) Reset() {
+	*x = GetConsentStatsRequest{}
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConsentStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConsentStatsRequest) ProtoMessage() {}
+
+func (x *GetConsentStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConsentStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetConsentStatsRequest) Descriptor() ([]byte, []int) {
+	return file_pkg_api_consent_consent_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *GetConsentStatsRequest) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
+type GetConsentStatsResponse struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TotalConsents      int32                  `protobuf:"varint,1,opt,name=total_consents,json=totalConsents,proto3" json:"total_consents,omitempty"`
+	ActiveConsents     int32                  `protobuf:"varint,2,opt,name=active_consents,json=activeConsents,proto3" json:"active_consents,omitempty"`
+	RevokedConsents    int32                  `protobuf:"varint,3,opt,name=revoked_consents,json=revokedConsents,proto3" json:"revoked_consents,omitempty"`
+	ConsentsByDocument map[string]int32       `protobuf:"bytes,4,rep,name=consents_by_document,json=consentsByDocument,proto3" json:"consents_by_document,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	ConsentsByPlatform map[string]int32       `protobuf:"bytes,5,rep,name=consents_by_platform,json=consentsByPlatform,proto3" json:"consents_by_platform,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	ConsentsByMethod   map[string]int32       `protobuf:"bytes,6,rep,name=consents_by_method,json=consentsByMethod,proto3" json:"consents_by_method,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *GetConsentStatsResponse) Reset() {
+	*x = GetConsentStatsResponse{}
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConsentStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConsentStatsResponse) ProtoMessage() {}
+
+func (x *GetConsentStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_consent_consent_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConsentStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetConsentStatsResponse) Descriptor() ([]byte, []int) {
+	return file_pkg_api_consent_consent_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *GetConsentStatsResponse) GetTotalConsents() int32 {
+	if x != nil {
+		return x.TotalConsents
+	}
+	return 0
+}
+
+func (x *GetConsentStatsResponse) GetActiveConsents() int32 {
+	if x != nil {
+		return x.ActiveConsents
+	}
+	return 0
+}
+
+func (x *GetConsentStatsResponse) GetRevokedConsents() int32 {
+	if x != nil {
+		return x.RevokedConsents
+	}
+	return 0
+}
+
+func (x *GetConsentStatsResponse) GetConsentsByDocument() map[string]int32 {
+	if x != nil {
+		return x.ConsentsByDocument
+	}
+	return nil
+}
+
+func (x *GetConsentStatsResponse) GetConsentsByPlatform() map[string]int32 {
+	if x != nil {
+		return x.ConsentsByPlatform
+	}
+	return nil
+}
+
+func (x *GetConsentStatsResponse) GetConsentsByMethod() map[string]int32 {
+	if x != nil {
+		return x.ConsentsByMethod
+	}
+	return nil
+}
+
 var File_pkg_api_consent_consent_proto protoreflect.FileDescriptor
 
 const file_pkg_api_consent_consent_proto_rawDesc = "" +
 	"\n" +
-	"\x1dpkg/api/consent/consent.proto\x12\aconsent\"\xe7\x03\n" +
+	"\x1dpkg/api/consent/consent.proto\x12\aconsent\"\xe9\x04\n" +
 	"\aConsent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1a\n" +
@@ -923,7 +1190,13 @@ const file_pkg_api_consent_consent_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x0e \x01(\x03R\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\x0f \x01(\x03R\tupdatedAt\"\xa9\x01\n" +
+	"updated_at\x18\x0f \x01(\x03R\tupdatedAt\x12\x1b\n" +
+	"\tis_latest\x18\x10 \x01(\bR\bisLatest\x12\x1d\n" +
+	"\n" +
+	"revoked_at\x18\x11 \x01(\x03R\trevokedAt\x12%\n" +
+	"\x0erevoked_reason\x18\x12 \x01(\tR\rrevokedReason\x12\x1d\n" +
+	"\n" +
+	"revoked_by\x18\x13 \x01(\tR\trevokedBy\"\xa9\x01\n" +
 	"\fConsentInput\x12\x1f\n" +
 	"\vdocument_id\x18\x01 \x01(\tR\n" +
 	"documentId\x12#\n" +
@@ -976,13 +1249,40 @@ const file_pkg_api_consent_consent_proto_rawDesc = "" +
 	"\x11version_timestamp\x18\x03 \x01(\x03R\x10versionTimestamp\"K\n" +
 	"\x15RevokeConsentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2\xb8\x03\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"T\n" +
+	"\x18GetConsentHistoryRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1f\n" +
+	"\vdocument_id\x18\x02 \x01(\tR\n" +
+	"documentId\"]\n" +
+	"\x19GetConsentHistoryResponse\x12*\n" +
+	"\ahistory\x18\x01 \x03(\v2\x10.consent.ConsentR\ahistory\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"4\n" +
+	"\x16GetConsentStatsRequest\x12\x1a\n" +
+	"\bplatform\x18\x01 \x01(\tR\bplatform\"\xa5\x05\n" +
+	"\x17GetConsentStatsResponse\x12%\n" +
+	"\x0etotal_consents\x18\x01 \x01(\x05R\rtotalConsents\x12'\n" +
+	"\x0factive_consents\x18\x02 \x01(\x05R\x0eactiveConsents\x12)\n" +
+	"\x10revoked_consents\x18\x03 \x01(\x05R\x0frevokedConsents\x12j\n" +
+	"\x14consents_by_document\x18\x04 \x03(\v28.consent.GetConsentStatsResponse.ConsentsByDocumentEntryR\x12consentsByDocument\x12j\n" +
+	"\x14consents_by_platform\x18\x05 \x03(\v28.consent.GetConsentStatsResponse.ConsentsByPlatformEntryR\x12consentsByPlatform\x12d\n" +
+	"\x12consents_by_method\x18\x06 \x03(\v26.consent.GetConsentStatsResponse.ConsentsByMethodEntryR\x10consentsByMethod\x1aE\n" +
+	"\x17ConsentsByDocumentEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aE\n" +
+	"\x17ConsentsByPlatformEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\x1aC\n" +
+	"\x15ConsentsByMethodEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x012\xea\x04\n" +
 	"\x0eConsentService\x12N\n" +
 	"\rRecordConsent\x12\x1d.consent.RecordConsentRequest\x1a\x1e.consent.RecordConsentResponse\x12K\n" +
 	"\fCheckConsent\x12\x1c.consent.CheckConsentRequest\x1a\x1d.consent.CheckConsentResponse\x12T\n" +
 	"\x0fGetUserConsents\x12\x1f.consent.GetUserConsentsRequest\x1a .consent.GetUserConsentsResponse\x12c\n" +
 	"\x14CheckPendingConsents\x12$.consent.CheckPendingConsentsRequest\x1a%.consent.CheckPendingConsentsResponse\x12N\n" +
-	"\rRevokeConsent\x12\x1d.consent.RevokeConsentRequest\x1a\x1e.consent.RevokeConsentResponseB<Z:github.com/thatlq1812/policy-system/shared/pkg/api/consentb\x06proto3"
+	"\rRevokeConsent\x12\x1d.consent.RevokeConsentRequest\x1a\x1e.consent.RevokeConsentResponse\x12Z\n" +
+	"\x11GetConsentHistory\x12!.consent.GetConsentHistoryRequest\x1a\".consent.GetConsentHistoryResponse\x12T\n" +
+	"\x0fGetConsentStats\x12\x1f.consent.GetConsentStatsRequest\x1a .consent.GetConsentStatsResponseB<Z:github.com/thatlq1812/policy-system/shared/pkg/api/consentb\x06proto3"
 
 var (
 	file_pkg_api_consent_consent_proto_rawDescOnce sync.Once
@@ -996,7 +1296,7 @@ func file_pkg_api_consent_consent_proto_rawDescGZIP() []byte {
 	return file_pkg_api_consent_consent_proto_rawDescData
 }
 
-var file_pkg_api_consent_consent_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_pkg_api_consent_consent_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_pkg_api_consent_consent_proto_goTypes = []any{
 	(*Consent)(nil),                      // 0: consent.Consent
 	(*ConsentInput)(nil),                 // 1: consent.ConsentInput
@@ -1011,6 +1311,13 @@ var file_pkg_api_consent_consent_proto_goTypes = []any{
 	(*CheckPendingConsentsResponse)(nil), // 10: consent.CheckPendingConsentsResponse
 	(*RevokeConsentRequest)(nil),         // 11: consent.RevokeConsentRequest
 	(*RevokeConsentResponse)(nil),        // 12: consent.RevokeConsentResponse
+	(*GetConsentHistoryRequest)(nil),     // 13: consent.GetConsentHistoryRequest
+	(*GetConsentHistoryResponse)(nil),    // 14: consent.GetConsentHistoryResponse
+	(*GetConsentStatsRequest)(nil),       // 15: consent.GetConsentStatsRequest
+	(*GetConsentStatsResponse)(nil),      // 16: consent.GetConsentStatsResponse
+	nil,                                  // 17: consent.GetConsentStatsResponse.ConsentsByDocumentEntry
+	nil,                                  // 18: consent.GetConsentStatsResponse.ConsentsByPlatformEntry
+	nil,                                  // 19: consent.GetConsentStatsResponse.ConsentsByMethodEntry
 }
 var file_pkg_api_consent_consent_proto_depIdxs = []int32{
 	1,  // 0: consent.RecordConsentRequest.consents:type_name -> consent.ConsentInput
@@ -1019,21 +1326,29 @@ var file_pkg_api_consent_consent_proto_depIdxs = []int32{
 	0,  // 3: consent.GetUserConsentsResponse.consents:type_name -> consent.Consent
 	8,  // 4: consent.CheckPendingConsentsRequest.latest_policies:type_name -> consent.PendingPolicy
 	8,  // 5: consent.CheckPendingConsentsResponse.pending_policies:type_name -> consent.PendingPolicy
-	2,  // 6: consent.ConsentService.RecordConsent:input_type -> consent.RecordConsentRequest
-	4,  // 7: consent.ConsentService.CheckConsent:input_type -> consent.CheckConsentRequest
-	6,  // 8: consent.ConsentService.GetUserConsents:input_type -> consent.GetUserConsentsRequest
-	9,  // 9: consent.ConsentService.CheckPendingConsents:input_type -> consent.CheckPendingConsentsRequest
-	11, // 10: consent.ConsentService.RevokeConsent:input_type -> consent.RevokeConsentRequest
-	3,  // 11: consent.ConsentService.RecordConsent:output_type -> consent.RecordConsentResponse
-	5,  // 12: consent.ConsentService.CheckConsent:output_type -> consent.CheckConsentResponse
-	7,  // 13: consent.ConsentService.GetUserConsents:output_type -> consent.GetUserConsentsResponse
-	10, // 14: consent.ConsentService.CheckPendingConsents:output_type -> consent.CheckPendingConsentsResponse
-	12, // 15: consent.ConsentService.RevokeConsent:output_type -> consent.RevokeConsentResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	0,  // 6: consent.GetConsentHistoryResponse.history:type_name -> consent.Consent
+	17, // 7: consent.GetConsentStatsResponse.consents_by_document:type_name -> consent.GetConsentStatsResponse.ConsentsByDocumentEntry
+	18, // 8: consent.GetConsentStatsResponse.consents_by_platform:type_name -> consent.GetConsentStatsResponse.ConsentsByPlatformEntry
+	19, // 9: consent.GetConsentStatsResponse.consents_by_method:type_name -> consent.GetConsentStatsResponse.ConsentsByMethodEntry
+	2,  // 10: consent.ConsentService.RecordConsent:input_type -> consent.RecordConsentRequest
+	4,  // 11: consent.ConsentService.CheckConsent:input_type -> consent.CheckConsentRequest
+	6,  // 12: consent.ConsentService.GetUserConsents:input_type -> consent.GetUserConsentsRequest
+	9,  // 13: consent.ConsentService.CheckPendingConsents:input_type -> consent.CheckPendingConsentsRequest
+	11, // 14: consent.ConsentService.RevokeConsent:input_type -> consent.RevokeConsentRequest
+	13, // 15: consent.ConsentService.GetConsentHistory:input_type -> consent.GetConsentHistoryRequest
+	15, // 16: consent.ConsentService.GetConsentStats:input_type -> consent.GetConsentStatsRequest
+	3,  // 17: consent.ConsentService.RecordConsent:output_type -> consent.RecordConsentResponse
+	5,  // 18: consent.ConsentService.CheckConsent:output_type -> consent.CheckConsentResponse
+	7,  // 19: consent.ConsentService.GetUserConsents:output_type -> consent.GetUserConsentsResponse
+	10, // 20: consent.ConsentService.CheckPendingConsents:output_type -> consent.CheckPendingConsentsResponse
+	12, // 21: consent.ConsentService.RevokeConsent:output_type -> consent.RevokeConsentResponse
+	14, // 22: consent.ConsentService.GetConsentHistory:output_type -> consent.GetConsentHistoryResponse
+	16, // 23: consent.ConsentService.GetConsentStats:output_type -> consent.GetConsentStatsResponse
+	17, // [17:24] is the sub-list for method output_type
+	10, // [10:17] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_pkg_api_consent_consent_proto_init() }
@@ -1047,7 +1362,7 @@ func file_pkg_api_consent_consent_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_api_consent_consent_proto_rawDesc), len(file_pkg_api_consent_consent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

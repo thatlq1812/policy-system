@@ -199,6 +199,7 @@ func domainToProto(c *domain.UserConsent) *pb.Consent {
 		AgreedAt:         c.AgreedAt.Unix(),
 		ConsentMethod:    c.ConsentMethod,
 		IsDeleted:        c.IsDeleted,
+		IsLatest:         c.IsLatest, // Phase 2
 		CreatedAt:        c.CreatedAt.Unix(),
 		UpdatedAt:        c.UpdatedAt.Unix(),
 	}
@@ -220,7 +221,25 @@ func domainToProto(c *domain.UserConsent) *pb.Consent {
 		consent.DeletedAt = c.DeletedAt.Unix()
 	}
 
+	// Phase 2: History tracking fields
+	if c.RevokedAt != nil {
+		consent.RevokedAt = c.RevokedAt.Unix()
+	}
+
+	if c.RevokedReason != nil {
+		consent.RevokedReason = *c.RevokedReason
+	}
+
+	if c.RevokedBy != nil {
+		consent.RevokedBy = *c.RevokedBy
+	}
+
 	return consent
+}
+
+// Alias for domainToProto for consistency with GetConsentHistory
+func domainConsentToProto(c *domain.UserConsent) *pb.Consent {
+	return domainToProto(c)
 }
 
 // Helper: Map service errors to gRPC status codes
@@ -248,6 +267,63 @@ func mapError(err error) error {
 
 	// Default: Internal error
 	return status.Error(codes.Internal, "internal server error")
+}
+
+// GetConsentHistory - Get all consent versions for user+document
+func (h *ConsentHandler) GetConsentHistory(ctx context.Context, req *pb.GetConsentHistoryRequest) (*pb.GetConsentHistoryResponse, error) {
+	// Validate request
+	if req.UserId == "" || req.DocumentId == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id and document_id are required")
+	}
+
+	// Call service
+	history, err := h.service.GetConsentHistory(ctx, req.UserId, req.DocumentId)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	// Convert to proto
+	var pbConsents []*pb.Consent
+	for _, c := range history {
+		pbConsents = append(pbConsents, domainConsentToProto(c))
+	}
+
+	return &pb.GetConsentHistoryResponse{
+		History: pbConsents,
+		Total:   int32(len(pbConsents)),
+	}, nil
+}
+
+// GetConsentStats - Get consent statistics
+func (h *ConsentHandler) GetConsentStats(ctx context.Context, req *pb.GetConsentStatsRequest) (*pb.GetConsentStatsResponse, error) {
+	// Call service
+	stats, err := h.service.GetConsentStats(ctx, req.Platform)
+	if err != nil {
+		return nil, mapError(err)
+	}
+
+	// Convert map to proto response
+	response := &pb.GetConsentStatsResponse{
+		TotalConsents:      int32(stats["total_consents"]),
+		ActiveConsents:     int32(stats["active_consents"]),
+		RevokedConsents:    int32(stats["revoked_consents"]),
+		ConsentsByDocument: make(map[string]int32),
+		ConsentsByPlatform: make(map[string]int32),
+		ConsentsByMethod:   make(map[string]int32),
+	}
+
+	// Parse stats map
+	for key, value := range stats {
+		if key[:4] == "doc_" {
+			response.ConsentsByDocument[key[4:]] = int32(value)
+		} else if key[:9] == "platform_" {
+			response.ConsentsByPlatform[key[9:]] = int32(value)
+		} else if key[:7] == "method_" {
+			response.ConsentsByMethod[key[7:]] = int32(value)
+		}
+	}
+
+	return response, nil
 }
 
 func contains(s, substr string) bool {

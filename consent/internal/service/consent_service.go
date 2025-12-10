@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/thatlq1812/policy-system/consent/internal/clients"
 	"github.com/thatlq1812/policy-system/consent/internal/domain"
 	"github.com/thatlq1812/policy-system/consent/internal/repository"
 )
@@ -23,14 +24,24 @@ type ConsentService interface {
 
 	// Revoke consent (soft delete)
 	RevokeConsent(ctx context.Context, userID, documentID string, versionTimestamp int64) error
+
+	// Phase 2: Get consent history for a user+document
+	GetConsentHistory(ctx context.Context, userID, documentID string) ([]*domain.UserConsent, error)
+
+	// Phase 4: Get consent statistics
+	GetConsentStats(ctx context.Context, platform string) (map[string]int, error)
 }
 
 type consentService struct {
-	repo repository.ConsentRepository
+	repo      repository.ConsentRepository
+	docClient *clients.DocumentClient // NEW: Document Service client
 }
 
-func NewConsentService(repo repository.ConsentRepository) ConsentService {
-	return &consentService{repo: repo}
+func NewConsentService(repo repository.ConsentRepository, docClient *clients.DocumentClient) ConsentService {
+	return &consentService{
+		repo:      repo,
+		docClient: docClient,
+	}
 }
 
 // RecordConsentsParams input for bulk consent
@@ -74,12 +85,42 @@ func (s *consentService) RecordConsents(ctx context.Context, params RecordConsen
 		return nil, fmt.Errorf("consents list cannot be empty")
 	}
 
+	var result []*domain.UserConsent
+
 	// Convert to repository params
 	var repoParams []domain.CreateConsentParams
 	for _, c := range params.Consents {
 		// Validate required fields
 		if c.DocumentID == "" || c.DocumentName == "" || c.VersionTimestamp == 0 {
 			return nil, fmt.Errorf("invalid consent input: document_id, document_name, and version_timestamp are required")
+		}
+
+		// PHASE 1: Verify document exists in Document Service
+		if s.docClient != nil {
+			doc, err := s.docClient.VerifyDocument(ctx, params.Platform, c.DocumentName)
+			if err != nil {
+				return nil, fmt.Errorf("document verification failed for %s: %w", c.DocumentName, err)
+			}
+			if doc == nil {
+				return nil, fmt.Errorf("document not found: %s", c.DocumentName)
+			}
+			// Verify version matches
+			if doc.EffectiveTimestamp != c.VersionTimestamp {
+				return nil, fmt.Errorf("document version mismatch for %s: requested %d, current %d",
+					c.DocumentName, c.VersionTimestamp, doc.EffectiveTimestamp)
+			}
+		}
+
+		// PHASE 1: Check if consent already exists (idempotency)
+		existing, err := s.repo.GetExisting(ctx, params.UserID, c.DocumentID, c.VersionTimestamp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check existing consent: %w", err)
+		}
+
+		if existing != nil {
+			// Consent already exists, return it (idempotent)
+			result = append(result, existing)
+			continue
 		}
 
 		repoParams = append(repoParams, domain.CreateConsentParams{
@@ -181,6 +222,27 @@ func (s *consentService) RevokeConsent(ctx context.Context, userID, documentID s
 	}
 
 	return nil
+}
+
+// GetConsentHistory retrieves all historical consents for a user+document combination
+func (s *consentService) GetConsentHistory(ctx context.Context, userID, documentID string) ([]*domain.UserConsent, error) {
+	if userID == "" || documentID == "" {
+		return nil, fmt.Errorf("user_id and document_id are required")
+	}
+
+	return s.repo.GetConsentHistory(ctx, userID, documentID)
+}
+
+// GetConsentStats retrieves aggregated statistics about consents
+func (s *consentService) GetConsentStats(ctx context.Context, platform string) (map[string]int, error) {
+	// Validate platform if provided
+	if platform != "" {
+		if err := validatePlatform(platform); err != nil {
+			return nil, err
+		}
+	}
+
+	return s.repo.GetConsentStats(ctx, platform)
 }
 
 // Validation helpers

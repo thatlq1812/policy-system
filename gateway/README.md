@@ -1,73 +1,103 @@
-# Gateway Service
+# Gateway Service - API Gateway
 
-HTTP/REST API Gateway that proxies requests to gRPC microservices with JWT authentication.
+HTTP/REST API Gateway for routing and authenticating requests to gRPC microservices.
+
+**Version:** 0.1.0 | **Status:** Planning Phase | **Port:** 8080 (HTTP/REST) | **Framework:** Gin
+
+---
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Quick Start](#quick-start)
+3. [Environment Variables](#environment-variables)
+4. [API Reference](#api-reference)
+5. [Troubleshooting](#troubleshooting)
+
+---
 
 ## Overview
 
-**Port:** 8080  
-**Protocol:** HTTP/REST (converts to gRPC)  
-**Language:** Go 1.21+  
-**Framework:** Gin
+### Features
 
-## Architecture
+- HTTP/REST to gRPC protocol translation
+- JWT authentication and authorization
+- Centralized error handling
+- Request logging
+- Proxying to User, Document, and Consent Services
+
+### Architecture
 
 ```
 Client (HTTP/REST)
-    ↓
+    |
 Gateway Service :8080
-    ├── JWT Verification
-    ├── Rate Limiting
-    ├── Error Handling
-    └── gRPC Clients
-        ├→ User Service :50052
-        ├→ Document Service :50051
-        └→ Consent Service :50053
+    |-- JWT Verification Middleware
+    |-- Error Handling Middleware
+    |-- gRPC Clients
+        |-- User Service :50052
+        |-- Document Service :50051
+        +-- Consent Service :50053
 ```
+
+---
 
 ## Quick Start
 
-### Prerequisites
-- Docker & Docker Compose
-- Go 1.21+ (for local development)
-- All backend services running (user, document, consent)
-
-### Run with Docker
+### Run with Docker (Recommended)
 ```bash
-# From project root
+# From project root d:/w2
 docker-compose up -d gateway
 
 # Check logs
 docker-compose logs -f gateway
 
-# Test health
+# Verify health check
 curl http://localhost:8080/health
 ```
 
-### Run Locally
+### Run Locally (Development)
 ```bash
 cd gateway
 
 # Install dependencies
 go mod download
 
-# Set environment variables
-export JWT_SECRET="your-secret-key-min-32-chars"
-export USER_SERVICE_URL="localhost:50052"
-export DOCUMENT_SERVICE_URL="localhost:50051"
-export CONSENT_SERVICE_URL="localhost:50053"
-export SERVER_PORT="8080"
+# Set environment variables (example .env)
+# JWT_SECRET="your-secret-key-min-32-chars-recommended-64"
+# USER_SERVICE_URL="localhost:50052"
+# DOCUMENT_SERVICE_URL="localhost:50051"
+# CONSENT_SERVICE_URL="localhost:50053"
+# GRPC_PORT="8080"
 
 # Run service
 go run cmd/server/main.go
+
+# Or build binary
+go build -o bin/gateway cmd/server/main.go
+./bin/gateway
 ```
 
-## API Endpoints
+---
+
+## Environment Variables
+| Variable             | Description                          | Default         | Required |
+|----------------------|--------------------------------------|-----------------|----------|
+| `JWT_SECRET`         | Secret key for JWT signing           | -               | Yes      |
+| `USER_SERVICE_URL`   | User Service gRPC endpoint           | `localhost:50052` | Yes      |
+| `DOCUMENT_SERVICE_URL` | Document Service gRPC endpoint       | `localhost:50051` | Yes      |
+| `CONSENT_SERVICE_URL` | Consent Service gRPC endpoint        | `localhost:50053` | Yes      |
+| `GRPC_PORT`          | HTTP/REST server port                | `8080`          | No       |
+
+---
+
+## API Reference
 
 ### Health Check
 
 **GET /health**
 
-Check if gateway is running.
+Purpose: Check if the gateway service is operational.
 
 ```bash
 curl http://localhost:8080/health
@@ -83,17 +113,13 @@ curl http://localhost:8080/health
 
 ---
 
-## Authentication APIs
+### Authentication Endpoints (`/api/auth`)
 
-All auth endpoints are under `/api/auth`
+**1. POST /api/auth/register**
 
-### 1. Register
+Purpose: Register a new user account.
 
-**POST /api/auth/register**
-
-Register new user account.
-
-**Request:**
+**Request Body:**
 ```json
 {
   "phone_number": "0912345678",
@@ -133,15 +159,11 @@ curl -X POST http://localhost:8080/api/auth/register \
   }'
 ```
 
----
+**2. POST /api/auth/login**
 
-### 2. Login
+Purpose: Authenticate user and obtain access and refresh tokens.
 
-**POST /api/auth/login**
-
-Authenticate user and get tokens.
-
-**Request:**
+**Request Body:**
 ```json
 {
   "phone_number": "0912345678",
@@ -170,15 +192,11 @@ curl -X POST http://localhost:8080/api/auth/login \
   }'
 ```
 
----
+**3. POST /api/auth/refresh**
 
-### 3. Refresh Token
+Purpose: Obtain a new access token using a valid refresh token.
 
-**POST /api/auth/refresh**
-
-Get new access token using refresh token.
-
-**Request:**
+**Request Body:**
 ```json
 {
   "refresh_token": "uuid-refresh-token"
@@ -199,24 +217,15 @@ Get new access token using refresh token.
 curl -X POST http://localhost:8080/api/auth/refresh \
   -H "Content-Type: application/json" \
   -d '{
-    "refresh_token": "your-refresh-token"
+    "refresh_token": "uuid-refresh-token"
   }'
 ```
 
----
+**4. POST /api/auth/logout**
 
-### 4. Logout
+Purpose: Revoke a specific refresh token, invalidating the session.
 
-**POST /api/auth/logout**
-
-Revoke refresh token.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request:**
+**Request Body:**
 ```json
 {
   "refresh_token": "uuid-refresh-token"
@@ -226,7 +235,6 @@ Authorization: Bearer <access_token>
 **Response:** `200 OK`
 ```json
 {
-  "success": true,
   "message": "Successfully logged out"
 }
 ```
@@ -234,32 +242,23 @@ Authorization: Bearer <access_token>
 **Example:**
 ```bash
 curl -X POST http://localhost:8080/api/auth/logout \
-  -H "Authorization: Bearer your-access-token" \
   -H "Content-Type: application/json" \
   -d '{
-    "refresh_token": "your-refresh-token"
+    "refresh_token": "uuid-refresh-token"
   }'
 ```
 
 ---
 
-## User Profile APIs
+### User Profile Endpoints (`/api/users`)
 
-All profile endpoints require authentication.
+**All endpoints require a valid JWT Access Token in the `Authorization` header.**
 
-**Base Path:** `/api/users`  
-**Auth Required:** Yes (JWT token)
+**1. GET /api/users/profile**
 
-### 5. Get My Profile
+Purpose: Retrieve the authenticated user's profile.
 
-**GET /api/users/me**
-
-Get current user's profile (user_id from JWT).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
+**Request:** `Authorization: Bearer <access_token>`
 
 **Response:** `200 OK`
 ```json
@@ -275,27 +274,18 @@ Authorization: Bearer <access_token>
 
 **Example:**
 ```bash
-curl http://localhost:8080/api/users/me \
-  -H "Authorization: Bearer your-access-token"
+curl -X GET http://localhost:8080/api/users/profile \
+  -H "Authorization: Bearer <your-access-token>"
 ```
 
----
+**2. PUT /api/users/profile**
 
-### 6. Update My Profile
+Purpose: Update the authenticated user's profile information.
 
-**PUT /api/users/me**
-
-Update current user's name and/or phone number.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request:**
+**Request Body:** (fields are optional)
 ```json
 {
-  "name": "New Name",
+  "name": "Jane Doe",
   "phone_number": "0987654321"
 }
 ```
@@ -303,728 +293,288 @@ Authorization: Bearer <access_token>
 **Response:** `200 OK`
 ```json
 {
-  "user": { /* updated user object */ },
-  "message": "Profile updated successfully"
-}
-```
-
-**Example:**
-```bash
-curl -X PUT http://localhost:8080/api/users/me \
-  -H "Authorization: Bearer your-access-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "New Name"
-  }'
-```
-
----
-
-### 7. Change Password
-
-**PUT /api/users/me/password**
-
-Change current user's password.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request:**
-```json
-{
-  "old_password": "OldPass123!",
-  "new_password": "NewPass456!"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "message": "Password changed successfully. Please login again on all devices."
-}
-```
-
-**Example:**
-```bash
-curl -X PUT http://localhost:8080/api/users/me/password \
-  -H "Authorization: Bearer your-access-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "old_password": "OldPass123!",
-    "new_password": "NewPass456!"
-  }'
-```
-
----
-
-## Document APIs
-
-**Base Path:** `/api/documents`  
-**Auth Required:** Yes (some endpoints)
-
-### 8. List Documents
-
-**GET /api/documents**
-
-Get all published documents (no auth required for public view).
-
-**Query Parameters:**
-- `status` (optional): Filter by status (Draft, Published, Archived)
-
-**Response:** `200 OK`
-```json
-{
-  "documents": [
-    {
-      "id": "doc-uuid",
-      "title": "Privacy Policy",
-      "content": "Full content...",
-      "version": 3,
-      "status": "Published",
-      "effective_date": "2025-01-01",
-      "created_at": 1733740800,
-      "updated_at": 1733740800
-    }
-  ],
-  "total_count": 5
-}
-```
-
-**Example:**
-```bash
-# Get all published documents
-curl http://localhost:8080/api/documents
-
-# Filter by status
-curl http://localhost:8080/api/documents?status=Published
-```
-
----
-
-### 9. Get Document by Title
-
-**GET /api/documents/title/:title**
-
-Get latest published version of a document.
-
-**Parameters:**
-- `title`: Document title (URL encoded)
-
-**Response:** `200 OK`
-```json
-{
-  "id": "doc-uuid",
-  "title": "Privacy Policy",
-  "content": "Full content...",
-  "version": 3,
-  "status": "Published",
-  "effective_date": "2025-01-01",
-  "created_at": 1733740800,
-  "updated_at": 1733740800
-}
-```
-
-**Example:**
-```bash
-curl http://localhost:8080/api/documents/title/Privacy%20Policy
-```
-
----
-
-### 10. Get Document by ID
-
-**GET /api/documents/:id**
-
-Get specific document version by ID.
-
-**Response:** `200 OK`
-```json
-{
-  "id": "doc-uuid",
-  "title": "Privacy Policy",
-  "content": "Full content...",
-  "version": 3,
-  "status": "Published",
-  "effective_date": "2025-01-01",
-  "created_at": 1733740800,
-  "updated_at": 1733740800
-}
-```
-
-**Example:**
-```bash
-curl http://localhost:8080/api/documents/doc-uuid-here
-```
-
----
-
-### 11. Create Document (Admin)
-
-**POST /api/documents**
-
-Create new policy document (Admin only).
-
-**Headers:**
-```
-Authorization: Bearer <admin-access-token>
-```
-
-**Request:**
-```json
-{
-  "title": "Cookie Policy",
-  "content": "We use cookies...",
-  "effective_date": "2025-06-01"
-}
-```
-
-**Response:** `201 Created`
-```json
-{
-  "id": "new-doc-uuid",
-  "title": "Cookie Policy",
-  "content": "We use cookies...",
-  "version": 1,
-  "status": "Draft",
-  "effective_date": "2025-06-01",
-  "owner": "admin-uuid",
-  "created_at": 1733740800,
-  "updated_at": 1733740800
-}
-```
-
-**Example:**
-```bash
-curl -X POST http://localhost:8080/api/documents \
-  -H "Authorization: Bearer admin-access-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Cookie Policy",
-    "content": "We use cookies...",
-    "effective_date": "2025-06-01"
-  }'
-```
-
----
-
-### 12. Update Document (Admin)
-
-**PUT /api/documents/:id**
-
-Update document (creates new version if published).
-
-**Headers:**
-```
-Authorization: Bearer <admin-access-token>
-```
-
-**Request:**
-```json
-{
-  "title": "Privacy Policy",
-  "content": "Updated content...",
-  "effective_date": "2025-04-01"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "id": "new-version-uuid",
-  "title": "Privacy Policy",
-  "version": 4,
-  "status": "Draft",
-  // ... other fields
-}
-```
-
-**Example:**
-```bash
-curl -X PUT http://localhost:8080/api/documents/doc-uuid \
-  -H "Authorization: Bearer admin-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Updated content"
-  }'
-```
-
----
-
-### 13. Publish Document (Admin)
-
-**POST /api/documents/:id/publish**
-
-Change document status from Draft to Published.
-
-**Headers:**
-```
-Authorization: Bearer <admin-access-token>
-```
-
-**Response:** `200 OK`
-```json
-{
-  "id": "doc-uuid",
-  "status": "Published",
-  // ... other fields
-}
-```
-
-**Example:**
-```bash
-curl -X POST http://localhost:8080/api/documents/doc-uuid/publish \
-  -H "Authorization: Bearer admin-token"
-```
-
----
-
-## Consent APIs
-
-**Base Path:** `/api/consents`  
-**Auth Required:** Yes
-
-### 14. Create Consent
-
-**POST /api/consents**
-
-Record user's acceptance of a policy document.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request:**
-```json
-{
-  "document_id": "privacy-policy-uuid",
-  "status": "Accepted"
-}
-```
-
-**Response:** `201 Created`
-```json
-{
-  "id": "consent-uuid",
-  "user_id": "user-uuid",
-  "document_id": "privacy-policy-uuid",
-  "version": 3,
-  "status": "Accepted",
-  "consented_at": 1733740800,
-  "created_at": 1733740800
-}
-```
-
-**Example:**
-```bash
-curl -X POST http://localhost:8080/api/consents \
-  -H "Authorization: Bearer your-access-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "document_id": "doc-uuid",
-    "status": "Accepted"
-  }'
-```
-
----
-
-### 15. Get My Consents
-
-**GET /api/consents/me**
-
-Get all consents for current user.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Response:** `200 OK`
-```json
-{
-  "consents": [
-    {
-      "id": "consent-uuid",
-      "user_id": "user-uuid",
-      "document_id": "doc-uuid",
-      "version": 3,
-      "status": "Accepted",
-      "consented_at": 1733740800
-    }
-  ],
-  "total_count": 2
-}
-```
-
-**Example:**
-```bash
-curl http://localhost:8080/api/consents/me \
-  -H "Authorization: Bearer your-access-token"
-```
-
----
-
-### 16. Check Consent Status
-
-**GET /api/consents/check**
-
-Check if user has valid consent for a document.
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Query Parameters:**
-- `document_title`: Title of the document
-
-**Response:** `200 OK`
-```json
-{
-  "has_consent": true,
-  "consent": {
-    "id": "consent-uuid",
-    "version": 3,
-    "status": "Accepted",
-    "consented_at": 1733740800
-  },
-  "is_latest_version": true
-}
-```
-
-**Example:**
-```bash
-curl "http://localhost:8080/api/consents/check?document_title=Privacy%20Policy" \
-  -H "Authorization: Bearer your-access-token"
-```
-
----
-
-### 17. Revoke Consent
-
-**PUT /api/consents/:id/revoke**
-
-Revoke a consent (GDPR compliance).
-
-**Headers:**
-```
-Authorization: Bearer <access_token>
-```
-
-**Request:**
-```json
-{
-  "reason": "User requested data deletion"
-}
-```
-
-**Response:** `200 OK`
-```json
-{
-  "id": "consent-uuid",
-  "status": "Revoked",
-  "revoked_at": 1733745000,
-  "revoked_reason": "User requested data deletion"
-}
-```
-
-**Example:**
-```bash
-curl -X PUT http://localhost:8080/api/consents/consent-uuid/revoke \
-  -H "Authorization: Bearer your-access-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "reason": "User requested data deletion"
-  }'
-```
-
----
-
-## Authentication Flow
-
-### JWT Token Structure
-
-**Access Token Claims:**
-```json
-{
-  "user_id": "uuid",
+  "id": "user-uuid",
+  "phone_number": "0987654321",
+  "name": "Jane Doe",
   "platform_role": "Client",
-  "type": "access",
-  "exp": 1733741700,
-  "iat": 1733740800
+  "created_at": 1733740800,
+  "updated_at": 1733740800
 }
 ```
 
-**Token Verification:**
-```go
-// Gateway middleware
-func AuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Extract token from Authorization header
-        authHeader := c.GetHeader("Authorization")
-        if authHeader == "" {
-            c.JSON(401, gin.H{"error": "Missing authorization header"})
-            c.Abort()
-            return
-        }
-
-        tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-
-        // Parse and verify JWT
-        token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-            return []byte(jwtSecret), nil
-        })
-
-        if err != nil || !token.Valid {
-            c.JSON(401, gin.H{"error": "Invalid or expired token"})
-            c.Abort()
-            return
-        }
-
-        // Extract claims
-        claims := token.Claims.(jwt.MapClaims)
-        c.Set("user_id", claims["user_id"].(string))
-        c.Set("platform_role", claims["platform_role"].(string))
-
-        c.Next()
-    }
-}
-```
-
-### Role-Based Access Control
-
-**Admin-Only Endpoints:**
-```go
-func RequireAdmin() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        role := c.GetString("platform_role")
-        if role != "Admin" {
-            c.JSON(403, gin.H{"error": "Admin access required"})
-            c.Abort()
-            return
-        }
-        c.Next()
-    }
-}
-
-// Apply to routes
-adminRoutes := router.Group("/api/admin")
-adminRoutes.Use(AuthMiddleware(), RequireAdmin())
-{
-    adminRoutes.POST("/documents", createDocumentHandler)
-    adminRoutes.PUT("/documents/:id", updateDocumentHandler)
-}
-```
-
-## Error Handling
-
-### Standard Error Response
-
-```json
-{
-  "error": "Error message",
-  "code": "ERROR_CODE",
-  "details": "Additional context"
-}
-```
-
-### HTTP Status Codes
-
-- `200 OK`: Success
-- `201 Created`: Resource created
-- `400 Bad Request`: Invalid input
-- `401 Unauthorized`: Missing or invalid token
-- `403 Forbidden`: Insufficient permissions
-- `404 Not Found`: Resource not found
-- `409 Conflict`: Duplicate or conflict
-- `500 Internal Server Error`: Server error
-
-### gRPC to HTTP Status Mapping
-
-```go
-grpc.Code                → HTTP Status
--------------------------------------------------
-OK                       → 200 OK
-InvalidArgument          → 400 Bad Request
-Unauthenticated          → 401 Unauthorized
-PermissionDenied         → 403 Forbidden
-NotFound                 → 404 Not Found
-AlreadyExists            → 409 Conflict
-Internal                 → 500 Internal Server Error
-```
-
-## Middleware Chain
-
-```
-Request
-  ↓
-[CORS Middleware] ← Allow cross-origin requests
-  ↓
-[Logger Middleware] ← Log request/response
-  ↓
-[Recovery Middleware] ← Recover from panics
-  ↓
-[Rate Limit Middleware] ← Limit requests
-  ↓
-[Auth Middleware] ← Verify JWT (if required)
-  ↓
-[Role Middleware] ← Check permissions (if required)
-  ↓
-Handler
-  ↓
-Response
-```
-
-## Configuration
-
-### Environment Variables
-
+**Example:**
 ```bash
-# Server
-SERVER_PORT="8080"
-
-# JWT
-JWT_SECRET="your-secret-key-minimum-32-characters-long"
-
-# Backend Services (docker network)
-USER_SERVICE_URL="user_service:50052"
-DOCUMENT_SERVICE_URL="document_service:50051"
-CONSENT_SERVICE_URL="consent_service:50053"
-
-# CORS (optional)
-ALLOWED_ORIGINS="http://localhost:3000,https://yourdomain.com"
-
-# Rate Limiting (optional)
-RATE_LIMIT_REQUESTS_PER_SECOND="10"
-RATE_LIMIT_BURST="20"
-```
-
-## Testing
-
-### Health Check
-```bash
-curl http://localhost:8080/health
-```
-
-### Complete User Flow
-```bash
-# 1. Register
-REGISTER=$(curl -s -X POST http://localhost:8080/api/auth/register \
+curl -X PUT http://localhost:8080/api/users/profile \
+  -H "Authorization: Bearer <your-access-token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "phone_number": "0999888777",
-    "password": "Test123456",
-    "name": "Test User",
-    "platform_role": "Client"
-  }')
+    "name": "Jane Doe"
+  }'
+```
 
-echo $REGISTER | jq
+**3. PUT /api/users/password**
 
-ACCESS_TOKEN=$(echo $REGISTER | jq -r '.access_token')
-REFRESH_TOKEN=$(echo $REGISTER | jq -r '.refresh_token')
+Purpose: Change the authenticated user's password.
 
-# 2. Get profile
-curl http://localhost:8080/api/users/me \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq
+**Request Body:**
+```json
+{
+  "old_password": "SecurePass123!",
+  "new_password": "NewSecurePass456!"
+}
+```
 
-# 3. Get documents
-curl http://localhost:8080/api/documents | jq
+**Response:** `200 OK`
+```json
+{
+  "message": "Password changed successfully"
+}
+```
 
-# 4. Accept privacy policy
-DOC_ID=$(curl -s http://localhost:8080/api/documents/title/Privacy%20Policy | jq -r '.id')
-
-curl -X POST http://localhost:8080/api/consents \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
+**Example:**
+```bash
+curl -X PUT http://localhost:8080/api/users/password \
+  -H "Authorization: Bearer <your-access-token>" \
   -H "Content-Type: application/json" \
-  -d "{\"document_id\": \"$DOC_ID\", \"status\": \"Accepted\"}" | jq
-
-# 5. Check consent
-curl "http://localhost:8080/api/consents/check?document_title=Privacy%20Policy" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" | jq
+  -d '{
+    "old_password": "SecurePass123!",
+    "new_password": "NewSecurePass456!"
+  }'
 ```
 
-## Performance Optimization
+---
 
-### Connection Pooling
+### Admin Endpoints (`/api/admin`)
 
-Gateway maintains persistent gRPC connections to backend services:
+**All endpoints require a valid JWT Access Token in the `Authorization` header and `Admin` platform role.**
 
-```go
-// Initialize once at startup
-userConn, _ := grpc.Dial(userServiceURL, grpc.WithInsecure())
-documentConn, _ := grpc.Dial(documentServiceURL, grpc.WithInsecure())
-consentConn, _ := grpc.Dial(consentServiceURL, grpc.WithInsecure())
+**1. GET /api/admin/users**
 
-// Reuse connections
-userClient := userpb.NewUserServiceClient(userConn)
-documentClient := documentpb.NewDocumentServiceClient(documentConn)
-consentClient := consentpb.NewConsentServiceClient(consentConn)
+Purpose: List users with optional pagination and role filtering.
+
+**Query Parameters:**
+- `page`: Page number (default: 1)
+- `pageSize`: Items per page (default: 10, max: 100)
+- `role`: Filter by platform role (e.g., `Client`, `Merchant`, `Admin`)
+- `includeDeleted`: Include soft-deleted users (default: false)
+
+**Response:** `200 OK`
+```json
+{
+  "users": [ /* array of user objects */ ],
+  "total_count": 100,
+  "total_pages": 10,
+  "current_page": 1
+}
 ```
 
-### Caching Strategy (Future)
+**Example:**
+```bash
+curl -X GET "http://localhost:8080/api/admin/users?page=1&pageSize=5&role=Client" \
+  -H "Authorization: Bearer <admin-access-token>"
+```
 
-- Cache public documents (5 min TTL)
-- Cache consent check results (1 min TTL)
-- Use Redis for distributed caching
+**2. GET /api/admin/users/search**
+
+Purpose: Search users by name or phone number.
+
+**Query Parameters:**
+- `query`: Search term (name or phone number)
+- `limit`: Maximum number of results (default: 10)
+
+**Response:** `200 OK`
+```json
+{
+  "users": [ /* array of user objects */ ]
+}
+```
+
+**Example:**
+```bash
+curl -X GET "http://localhost:8080/api/admin/users/search?query=John&limit=5" \
+  -H "Authorization: Bearer <admin-access-token>"
+```
+
+**3. DELETE /api/admin/users/:id**
+
+Purpose: Soft delete a user by ID.
+
+**Path Parameters:**
+- `:id`: User UUID
+
+**Request Body:**
+```json
+{
+  "reason": "Inactivity"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "message": "User soft-deleted successfully"
+}
+```
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:8080/api/admin/users/user-uuid-to-delete \
+  -H "Authorization: Bearer <admin-access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Inactivity"}'
+```
+
+**4. PUT /api/admin/users/:id/role**
+
+Purpose: Update a user's platform role.
+
+**Path Parameters:**
+- `:id`: User UUID
+
+**Request Body:**
+```json
+{
+  "new_platform_role": "Admin"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "id": "user-uuid",
+  "phone_number": "0912345678",
+  "name": "John Doe",
+  "platform_role": "Admin",
+  "created_at": 1733740800,
+  "updated_at": 1733740800
+}
+```
+
+**Example:**
+```bash
+curl -X PUT http://localhost:8080/api/admin/users/user-uuid-to-update/role \
+  -H "Authorization: Bearer <admin-access-token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "new_platform_role": "Merchant"
+  }'
+```
+
+---
+
+### Session Management Endpoints (`/api/sessions`)
+
+**All endpoints require a valid JWT Access Token in the `Authorization` header.**
+
+**1. GET /api/sessions**
+
+Purpose: Retrieve all active sessions for the authenticated user.
+
+**Request:** `Authorization: Bearer <access_token>`
+
+**Response:** `200 OK`
+```json
+{
+  "sessions": [
+    {
+      "id": "session-uuid-1",
+      "user_id": "user-uuid",
+      "expires_at": 1736332800,
+      "device_info": "Chrome on Windows",
+      "ip_address": "192.168.1.10"
+    },
+    { /* ... other sessions */ }
+  ],
+  "total_active_sessions": 2
+}
+```
+
+**Example:**
+```bash
+curl -X GET http://localhost:8080/api/sessions \
+  -H "Authorization: Bearer <your-access-token>"
+```
+
+**2. DELETE /api/sessions/all**
+
+Purpose: Revoke all active sessions for the authenticated user.
+
+**Request:** `Authorization: Bearer <access_token>`
+
+**Response:** `200 OK`
+```json
+{
+  "message": "All sessions revoked successfully",
+  "revoked_count": 2
+}
+```
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:8080/api/sessions/all \
+  -H "Authorization: Bearer <your-access-token>"
+```
+
+**3. DELETE /api/sessions/:id**
+
+Purpose: Revoke a specific session by its ID for the authenticated user.
+
+**Path Parameters:**
+- `:id`: Session (refresh token) UUID
+
+**Request:** `Authorization: Bearer <access_token>`
+
+**Response:** `200 OK`
+```json
+{
+  "message": "Session revoked successfully"
+}
+```
+
+**Example:**
+```bash
+curl -X DELETE http://localhost:8080/api/sessions/session-uuid-to-revoke \
+  -H "Authorization: Bearer <your-access-token>"
+```
+
+---
+
+### User Statistics Endpoints (`/api/stats`)
+
+**All endpoints require a valid JWT Access Token in the `Authorization` header and `Admin` platform role.**
+
+**1. GET /api/stats/users**
+
+Purpose: Retrieve comprehensive statistics about user accounts.
+
+**Request:** `Authorization: Bearer <admin-access-token>`
+
+**Response:** `200 OK`
+```json
+{
+  "total_users": 100,
+  "active_users": 90,
+  "deleted_users": 10,
+  "total_active_sessions": 150,
+  "users_by_role": {
+    "Client": 70,
+    "Merchant": 20,
+    "Admin": 10
+  }
+}
+```
+
+**Example:**
+```bash
+curl -X GET http://localhost:8080/api/stats/users \
+  -H "Authorization: Bearer <admin-access-token>"
+```
+
+---
 
 ## Troubleshooting
 
-### Gateway can't connect to services
-
-```bash
-# Check backend services are running
-docker-compose ps
-
-# Check network connectivity
-docker exec gateway ping document_service
-docker exec gateway ping user_service
-docker exec gateway ping consent_service
-
-# Verify service URLs in gateway config
-docker-compose logs gateway | grep "service_url"
-```
-
-### JWT verification fails
-
-```bash
-# Check JWT_SECRET matches User Service
-# Both must use same secret key
-
-# Decode token to check claims
-# Use https://jwt.io/ or:
-echo $ACCESS_TOKEN | cut -d'.' -f2 | base64 -d | jq
-```
-
-### CORS errors
-
-```bash
-# Update ALLOWED_ORIGINS in gateway config
-# Or add CORS middleware with wildcard (dev only):
-router.Use(cors.Default())
-```
-
-## Security Considerations
-
-1. **HTTPS Only:** Always use HTTPS in production
-2. **JWT Secret:** Use strong, random secret (32+ chars)
-3. **Rate Limiting:** Protect against DDoS
-4. **Input Validation:** Validate all request bodies
-5. **Error Messages:** Don't expose sensitive info in errors
-6. **CORS:** Restrict allowed origins in production
-
-## Related Services
-
-- **User Service:** Authentication backend (port 50052)
-- **Document Service:** Policy documents backend (port 50051)
-- **Consent Service:** Consent tracking backend (port 50053)
-
-## Support
-
-For issues or questions:
-1. Check logs: `docker-compose logs -f gateway`
-2. Test backend services: `grpcurl -plaintext localhost:5005X list`
-3. Verify JWT: https://jwt.io/
-4. Check network: `docker network inspect policy-system_default`
+- **Gateway not starting:** Check `docker-compose logs gateway` for errors.
+- **gRPC connection issues to microservices:** Verify `*_SERVICE_URL` environment variables and microservice container status.
+- **JWT errors:** Ensure `JWT_SECRET` is set correctly and tokens are valid.
+- **401 Unauthorized / 403 Forbidden:** Check JWT token validity and user's platform role.

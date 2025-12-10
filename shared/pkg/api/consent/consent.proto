@@ -20,6 +20,12 @@ service ConsentService {
   
   // Soft delete consent (revoke)
   rpc RevokeConsent(RevokeConsentRequest) returns (RevokeConsentResponse);
+  
+  // Phase 2: Get consent history for user+document
+  rpc GetConsentHistory(GetConsentHistoryRequest) returns (GetConsentHistoryResponse);
+  
+  // Phase 4: Get consent statistics
+  rpc GetConsentStats(GetConsentStatsRequest) returns (GetConsentStatsResponse);
 }
 
 // Messages
@@ -39,6 +45,11 @@ message Consent {
   int64 deleted_at = 13;
   int64 created_at = 14;
   int64 updated_at = 15;
+  // Phase 2: History tracking fields
+  bool is_latest = 16;
+  int64 revoked_at = 17;
+  string revoked_reason = 18;
+  string revoked_by = 19;
 }
 
 message ConsentInput {
@@ -115,4 +126,29 @@ message RevokeConsentRequest {
 message RevokeConsentResponse {
   bool success = 1;
   string message = 2;
+}
+
+// GetConsentHistory - Get all consent versions for user+document
+message GetConsentHistoryRequest {
+  string user_id = 1;
+  string document_id = 2;
+}
+
+message GetConsentHistoryResponse {
+  repeated Consent history = 1;
+  int32 total = 2;
+}
+
+// GetConsentStats - Get consent statistics
+message GetConsentStatsRequest {
+  string platform = 1; // Optional: filter by platform
+}
+
+message GetConsentStatsResponse {
+  int32 total_consents = 1;
+  int32 active_consents = 2;
+  int32 revoked_consents = 3;
+  map<string, int32> consents_by_document = 4;
+  map<string, int32> consents_by_platform = 5;
+  map<string, int32> consents_by_method = 6;
 }

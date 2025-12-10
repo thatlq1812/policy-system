@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/thatlq1812/policy-system/consent/internal/clients"
 	configs "github.com/thatlq1812/policy-system/consent/internal/configs"
 	"github.com/thatlq1812/policy-system/consent/internal/handler"
 	"github.com/thatlq1812/policy-system/consent/internal/repository"
@@ -40,19 +41,27 @@ func main() {
 	}
 	log.Println("Database connection established")
 
-	// 3. Initialize layers
+	// 3. Initialize Document Service client
+	docClient, err := clients.NewDocumentClient(cfg.DocumentServiceURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to document service: %v", err)
+	}
+	defer docClient.Close()
+	log.Printf("Connected to document service at %s", cfg.DocumentServiceURL)
+
+	// 4. Initialize layers
 	consentRepo := repository.NewConsentRepository(dbPool)
-	consentService := service.NewConsentService(consentRepo)
+	consentService := service.NewConsentService(consentRepo, docClient)
 	consentHandler := handler.NewConsentHandler(consentService)
 
-	// 4. Create gRPC server
+	// 5. Create gRPC server
 	grpcServer := grpc.NewServer()
 	pb.RegisterConsentServiceServer(grpcServer, consentHandler)
 
 	// Enable reflection for testing with grpcurl
 	reflection.Register(grpcServer)
 
-	// 5. Start listening
+	// 6. Start listening
 	listener, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
 		log.Fatalf("Failed to listen on port %s: %v", cfg.GRPCPort, err)
@@ -60,7 +69,7 @@ func main() {
 
 	log.Printf("Consent service listening on port %s", cfg.GRPCPort)
 
-	// 6. Graceful shutdown
+	// 7. Graceful shutdown
 	go func() {
 		if err := grpcServer.Serve(listener); err != nil {
 			log.Fatalf("Failed to serve: %v", err)

@@ -100,11 +100,14 @@ services:
       - consent/.env
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable
+      DOCUMENT_SERVICE_URL: document_service:50051
     ports:
       - "50053:50053"
     depends_on:
       postgres:
         condition: service_healthy
+      document_service:
+        condition: service_started
     networks:
       - policy_network
 

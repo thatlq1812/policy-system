@@ -9,9 +9,10 @@ import (
 )
 
 type Config struct {
-	GRPCPort    string
-	DatabaseURL string
-	DBMaxConn   int
+	GRPCPort           string
+	DatabaseURL        string
+	DBMaxConn          int
+	DocumentServiceURL string // NEW: URL to Document Service
 }
 
 func Load() (*Config, error) {
@@ -19,9 +20,10 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		GRPCPort:    getEnv("GRPC_PORT", "50053"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		DBMaxConn:   getEnvAsInt("DB_MAX_CONN", 10),
+		GRPCPort:           getEnv("GRPC_PORT", "50053"),
+		DatabaseURL:        getEnv("DATABASE_URL", ""),
+		DBMaxConn:          getEnvAsInt("DB_MAX_CONN", 10),
+		DocumentServiceURL: getEnv("DOCUMENT_SERVICE_URL", "localhost:50052"),
 	}
 
 	// Validate required fields

@@ -1,38 +1,55 @@
-# Consent Service
+# Consent Service - User Consent Management
 
-User consent management service for tracking policy document acceptances using gRPC.
+User consent management service for tracking policy document acceptances with full audit trail and GDPR compliance.
+
+**Version:** 1.0.0 | **Status:** Production Ready | **Port:** 50053 (gRPC) | **Methods:** 7/7
+
+---
+
+## Table of Contents
+
+1. [Overview](#overview)
+2. [Quick Start](#quick-start)
+3. [Environment Variables](#environment-variables)
+4. [Database Schema](#database-schema)
+5. [API Reference](#api-reference)
+6. [Testing Guide](#testing-guide)
+7. [Security & Compliance](#security--compliance)
+
+---
 
 ## Overview
 
-**Port:** 50053  
-**Protocol:** gRPC  
-**Database:** PostgreSQL (consent_db)  
-**Language:** Go 1.21+
+### Features
 
-## Architecture
+- Document verification with Document Service
+- Idempotent consent recording (duplicate prevention)
+- Complete consent history tracking
+- Version management with `is_latest` flag
+- Comprehensive statistics and analytics
+- GDPR-compliant audit trail
+- Transaction support for atomic operations
+
+### Architecture
 
 ```
 Client/Gateway
-    ↓
+    |
 Consent Service (gRPC)
-    ↓
-PostgreSQL (consent_db)
-    └── user_consents table
-    
-    → Calls Document Service (to verify documents)
+    |-- Service Layer (Business Logic)
+    |-- Repository Layer (Data Access)
+    |-- Document Service Client (gRPC)
+    +-- PostgreSQL Database
+        +-- user_consents table
 ```
+
+---
 
 ## Quick Start
 
-### Prerequisites
-- Docker & Docker Compose
-- Go 1.21+ (for local development)
-- PostgreSQL 15+
-- Document Service running (port 50051)
-
-### Run with Docker
+### Run with Docker (Recommended)
 ```bash
-# From project root
+# From project root d:/w2
 docker-compose up -d consent_service
 
 # Check logs
@@ -40,136 +57,162 @@ docker-compose logs -f consent_service
 
 # Run migrations
 docker-compose up consent_migrate
+
+# Verify service
+grpcurl -plaintext localhost:50053 list consent.ConsentService
 ```
 
-### Run Locally
+### Run Locally (Development)
 ```bash
 cd consent
 
 # Install dependencies
 go mod download
 
-# Set environment variables
-export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/consent_db?sslmode=disable"
-export DOCUMENT_SERVICE_URL="localhost:50051"
-export SERVER_PORT="50053"
+# Set environment variables (example .env)
+# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/consent_db?sslmode=disable"
+# DOCUMENT_SERVICE_URL="localhost:50051"
+# GRPC_PORT="50053"
 
 # Run service
 go run cmd/server/main.go
-```
 
-## Database Schema
-
-### user_consents
-```sql
-id              UUID PRIMARY KEY
-user_id         UUID NOT NULL           -- From User Service
-document_id     UUID NOT NULL           -- From Document Service
-version         INTEGER NOT NULL
-status          VARCHAR(50) NOT NULL    -- Accepted | Rejected | Revoked
-consented_at    TIMESTAMP NOT NULL
-revoked_at      TIMESTAMP
-revoked_reason  VARCHAR(255)
-created_at      TIMESTAMP
-updated_at      TIMESTAMP
-is_deleted      BOOLEAN DEFAULT FALSE
-
--- Unique constraint: one active consent per user per document
-UNIQUE(user_id, document_id) WHERE is_deleted = FALSE
-```
-
-**Status Values:**
-- `Accepted`: User agreed to the policy
-- `Rejected`: User declined the policy
-- `Revoked`: User withdrew consent (GDPR compliance)
-
-## API Methods
-
-### 1. CreateConsent
-**RPC:** `consent.ConsentService/CreateConsent`
-
-**Purpose:** Record user's acceptance of a policy document
-
-**Request:**
-```json
-{
-  "user_id": "user-uuid",
-  "document_id": "document-uuid",
-  "status": "Accepted"
-}
-```
-
-**Response:**
-```json
-{
-  "consent": {
-    "id": "consent-uuid",
-    "user_id": "user-uuid",
-    "document_id": "document-uuid",
-    "version": 3,
-    "status": "Accepted",
-    "consented_at": "1733740800",
-    "revoked_at": null,
-    "revoked_reason": null,
-    "created_at": "1733740800",
-    "updated_at": "1733740800"
-  }
-}
-```
-
-**Business Logic:**
-1. **Verify document exists** (call Document Service by document_id)
-2. **Extract version** from document
-3. Check if user already has consent for this document
-4. If exists and active → Return error (duplicate)
-5. If exists but revoked → Create new consent
-6. Create consent record with status and version
-7. Set consented_at = NOW()
-
-**Important:** Version is automatically extracted from the document. This ensures consent is tied to specific version.
-
-**Use Cases:**
-- User accepts terms during signup
-- User accepts updated privacy policy
-- User consents to data processing
-
-**Errors:**
-- `ALREADY_EXISTS`: User already consented to this document
-- `NOT_FOUND`: Document not found
-- `INVALID_ARGUMENT`: Invalid status or missing fields
-
-**Example:**
-```bash
-grpcurl -plaintext -d '{
-  "user_id": "user-uuid",
-  "document_id": "privacy-policy-v3-uuid",
-  "status": "Accepted"
-}' localhost:50053 consent.ConsentService/CreateConsent
+# Or build binary
+go build -o bin/consent cmd/server/main.go
+./bin/consent
 ```
 
 ---
 
-### 2. GetConsentByID
-**RPC:** `consent.ConsentService/GetConsentByID`
+## Environment Variables
+| Variable             | Description                          | Default         | Required |
+|----------------------|--------------------------------------|-----------------|----------|
+| `DATABASE_URL`       | PostgreSQL connection string         | -               | Yes      |
+| `DOCUMENT_SERVICE_URL` | Document Service gRPC endpoint       | `localhost:50051` | Yes      |
+| `GRPC_PORT`          | gRPC server port                     | `50053`         | No       |
 
-**Purpose:** Get specific consent record by UUID
+---
 
-**Request:**
-```json
-{
-  "id": "consent-uuid"
-}
+## Database Schema
+
+### user_consents table
+```sql
+CREATE TABLE user_consents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    platform VARCHAR(50) NOT NULL, -- Client | Merchant
+    document_id UUID NOT NULL,
+    document_name VARCHAR(255) NOT NULL,
+    version_timestamp BIGINT NOT NULL,
+    agreed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    agreed_file_url TEXT,
+    consent_method VARCHAR(50) NOT NULL, -- REGISTRATION | UI | API
+    ip_address VARCHAR(50),
+    user_agent TEXT,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP,
+    is_latest BOOLEAN DEFAULT TRUE, -- Indicates if this is the latest/current consent
+    revoked_at TIMESTAMP,
+    revoked_reason TEXT,
+    revoked_by VARCHAR(255),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for efficient lookup of active consents by user and document
+CREATE UNIQUE INDEX idx_active_consents 
+ON user_consents (user_id, document_id, version_timestamp) 
+WHERE is_deleted = FALSE AND is_latest = TRUE;
+
+-- Index for efficient history queries
+CREATE INDEX idx_user_document_history 
+ON user_consents(user_id, document_id, version_timestamp DESC, is_latest);
+
+-- Index for latest consents lookup
+CREATE INDEX idx_latest_consents 
+ON user_consents(user_id, is_latest) 
+WHERE is_latest = TRUE AND is_deleted = FALSE;
 ```
 
-**Response:**
-```json
-{
-  "consent": {
-    "id": "consent-uuid",
-    "user_id": "user-uuid",
-    "document_id": "document-uuid",
-    "version": 3,
-    "status": "Accepted",
+**Migrations:**
+- `000001_create_user_consents_table.up.sql`
+- `000002_add_history_tracking.up.sql`
+
+---
+
+## API Reference
+
+### Available Methods (7 Total)
+
+**Core Operations:**
+```
+consent.ConsentService.RecordConsent        - Record user consent for documents
+consent.ConsentService.CheckConsent         - Check if user has consented to a document version
+consent.ConsentService.GetUserConsents      - Retrieve all consents for a user
+consent.ConsentService.CheckPendingConsents - Identify policies user has not yet consented to
+consent.ConsentService.RevokeConsent        - Soft delete (revoke) a specific user consent
+```
+
+**History & Analytics:**
+```
+consent.ConsentService.GetConsentHistory    - Retrieve full consent history for a user and document
+consent.ConsentService.GetConsentStats      - Get aggregated consent statistics
+```
+
+---
+
+## Testing Guide
+
+### Using grpcurl
+
+To test the Consent Service endpoints, ensure the service is running and use `grpcurl` from your terminal.
+
+**Example: RecordConsent**
+```bash
+grpcurl -plaintext -d '{
+  "user_id": "user-id-123",
+  "platform": "Client",
+  "consents": [{
+    "document_id": "doc-id-456",
+    "document_name": "Privacy Policy",
+    "version_timestamp": 1678886400,
+    "agreed_file_url": "https://example.com/privacy_v1.pdf"
+  }],
+  "consent_method": "UI",
+  "ip_address": "192.168.1.1",
+  "user_agent": "Mozilla/5.0"
+}' localhost:50053 consent.ConsentService/RecordConsent
+```
+
+**Example: GetConsentHistory**
+```bash
+grpcurl -plaintext -d '{
+  "user_id": "user-id-123",
+  "document_id": "doc-id-456"
+}' localhost:50053 consent.ConsentService/GetConsentHistory
+```
+
+**Example: GetConsentStats**
+```bash
+grpcurl -plaintext -d '{"platform": "Client"}' localhost:50053 consent.ConsentService/GetConsentStats
+```
+
+---
+
+## Security & Compliance
+
+### GDPR Compliance Features
+- **Right to Withdraw:** `RevokeConsent` method supports user withdrawal of consent.
+- **Audit Trail:** Detailed tracking of consent actions including timestamps, IP, and user agent.
+- **Version Tracking:** Consents are linked to specific document versions for clarity.
+- **Data Portability:** `GetUserConsents` supports user data export.
+
+### Best Practices
+- All consent events are explicitly recorded, no implied consent.
+- Strict version tracking for all policy documents.
+- Comprehensive revocation reasons are stored.
+- Idempotent operations ensure data consistency.
+- Documents are verified with the Document Service prior to recording consent.
     "consented_at": "timestamp",
     "revoked_at": null,
     "revoked_reason": null,
@@ -1025,6 +1068,113 @@ CREATE UNIQUE INDEX idx_user_consents_user_document ON user_consents(user_id, do
 1. **Always record consent:** Never assume implied consent
 2. **Version tracking:** Store document version with consent
 3. **Revocation reasons:** Document why consent was revoked
+4. **Idempotent operations:** Use same request ID for retries
+5. **Document verification:** Always verify documents exist before consent
+
+---
+
+## 🆕 New Features (v1.0.0)
+
+### GetConsentHistory
+Get complete consent history for user+document combination
+
+```bash
+grpcurl -plaintext -d '{
+  "user_id": "user-123",
+  "document_id": "privacy-policy"
+}' localhost:50053 consent.ConsentService/GetConsentHistory
+```
+
+**Response:**
+```json
+{
+  "history": [
+    {
+      "id": "consent-3",
+      "version_timestamp": 1733900000,
+      "is_latest": true,
+      "agreed_at": 1733900000
+    },
+    {
+      "id": "consent-2",
+      "version_timestamp": 1733800000,
+      "is_latest": false,
+      "revoked_at": 1733900000,
+      "revoked_reason": "new_version"
+    },
+    {
+      "id": "consent-1",
+      "version_timestamp": 1733700000,
+      "is_latest": false
+    }
+  ],
+  "total": 3
+}
+```
+
+### GetConsentStats
+Get aggregated statistics about consents
+
+```bash
+# All platforms
+grpcurl -plaintext -d '{}' localhost:50053 consent.ConsentService/GetConsentStats
+
+# Specific platform
+grpcurl -plaintext -d '{
+  "platform": "Client"
+}' localhost:50053 consent.ConsentService/GetConsentStats
+```
+
+**Response:**
+```json
+{
+  "total_consents": 150,
+  "active_consents": 120,
+  "revoked_consents": 10,
+  "consents_by_document": {
+    "Privacy Policy": 50,
+    "Terms of Service": 50,
+    "Cookie Policy": 50
+  },
+  "consents_by_platform": {
+    "Client": 100,
+    "Merchant": 50
+  },
+  "consents_by_method": {
+    "REGISTRATION": 80,
+    "UI": 60,
+    "API": 10
+  }
+}
+```
+
+### Document Verification
+All RecordConsent calls now verify documents exist in Document Service
+
+```bash
+# This will fail if document doesn't exist or version mismatch
+grpcurl -plaintext -d '{
+  "user_id": "user-123",
+  "platform": "Client",
+  "consents": [{
+    "document_id": "doc-1",
+    "document_name": "Privacy Policy",
+    "version_timestamp": 1733900000
+  }],
+  "consent_method": "UI"
+}' localhost:50053 consent.ConsentService/RecordConsent
+```
+
+### Idempotent Operations
+Recording same consent twice returns existing consent, not error
+
+```bash
+# First call - creates consent
+grpcurl -plaintext -d '{...}' localhost:50053 consent.ConsentService/RecordConsent
+
+# Second call - returns same consent, no duplicate
+grpcurl -plaintext -d '{...}' localhost:50053 consent.ConsentService/RecordConsent
+```
 4. **Regular audits:** Monitor consent stats, identify outliers
 5. **Clear communication:** Show users what they're consenting to
 
