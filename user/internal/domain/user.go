@@ -24,7 +24,16 @@ type CreateUserParams struct {
 
 // UpdateUserParams holds parameters for updating user profile
 type UpdateUserParams struct {
-	ID   string
-	Name string
+	ID          string
+	Name        *string // Pointer to distinguish between no update and empty string
+	PhoneNumber *string // Pointer to distinguish between no update and empty string
 	// Add other updatable fields here
+}
+
+// ListUsersParams holds parameters for listing users with pagination
+type ListUsersParams struct {
+	Page           int
+	PageSize       int
+	PlatformRole   string
+	IncludeDeleted bool
 }

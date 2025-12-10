@@ -68,7 +68,10 @@ func (api *UserAPI) Register(w http.ResponseWriter, r *http.Request) {
 			"platform_role": grpcResp.User.PlatformRole,
 			"created_at":    grpcResp.User.CreatedAt,
 		},
-		"token": grpcResp.Token,
+		"access_token":             grpcResp.AccessToken,
+		"refresh_token":            grpcResp.RefreshToken,
+		"access_token_expires_at":  grpcResp.AccessTokenExpiresAt,
+		"refresh_token_expires_at": grpcResp.RefreshTokenExpiresAt,
 	}
 
 	response.Success(w, data)
@@ -110,7 +113,10 @@ func (api *UserAPI) Login(w http.ResponseWriter, r *http.Request) {
 			"name":          grpcResp.User.Name,
 			"platform_role": grpcResp.User.PlatformRole,
 		},
-		"token": grpcResp.Token,
+		"access_token":             grpcResp.AccessToken,
+		"refresh_token":            grpcResp.RefreshToken,
+		"access_token_expires_at":  grpcResp.AccessTokenExpiresAt,
+		"refresh_token_expires_at": grpcResp.RefreshTokenExpiresAt,
 	}
 
 	response.Success(w, data)

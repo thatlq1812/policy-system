@@ -8,6 +8,25 @@ service UserService {
     rpc Login(LoginRequest) returns (LoginResponse);
     rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse);
     rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+    // User profile management
+    rpc GetUserProfile(GetUserProfileRequest) returns (GetUserProfileResponse);
+    rpc UpdateUserProfile(UpdateUserProfileRequest) returns (UpdateUserProfileResponse);
+    rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+
+    // Admin operations
+    rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+    rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
+    rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+    rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse);
+
+    // Session management
+    rpc GetActiveSessions(GetActiveSessionsRequest) returns (GetActiveSessionsResponse);
+    rpc LogoutAllDevices(LogoutAllDevicesRequest) returns (LogoutAllDevicesResponse);
+    rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+
+    // Account statistics
+    rpc GetUserStats(GetUserStatsRequest) returns (GetUserStatsResponse);
 }
 
 // User represents a user in the system
@@ -53,6 +72,43 @@ message LoginResponse {
     int64 refresh_token_expires_at = 5; // Unix timestamp
 }
 
+message RefreshTokenInfo {
+    string id = 1; // Token ID
+    string device_info = 2; // Device information
+    string ip_address = 3; // IP address
+    int64 created_at = 4; // Creation timestamp
+    int64 expires_at = 5; // Expiration timestamp
+}
+
+message GetActiveSessionsRequest {
+    string user_id = 1;
+}
+
+message GetActiveSessionsResponse {
+    repeated RefreshTokenInfo sessions = 1;
+    int32 total_count = 2;
+}
+
+message LogoutAllDevicesRequest {
+    string user_id = 1;
+}
+
+message LogoutAllDevicesResponse {
+    bool success = 1;
+    int32 revoked_count = 2;
+    string message = 3;
+}
+
+message RevokeSessionRequest {
+    string user_id = 1;
+    string token_id = 2;
+}
+
+message RevokeSessionResponse {
+    bool success = 1;
+    string message = 2;
+}
+
 // ReqfreshTokenRequest - Client sends refresh token to get new access token
 message RefreshTokenRequest {
     string refresh_token = 1;
@@ -75,4 +131,97 @@ message LogoutRequest {
 message LogoutResponse {
     bool success = 1;
     string message = 2;
+}
+
+// GetUserProfile - Get current user's profile
+message GetUserProfileRequest {
+    string user_id = 1;
+}
+
+message GetUserProfileResponse {
+    User user = 1;
+}
+
+// UpdateUserProfile - Update current user's profile - name and/or phone number
+message UpdateUserProfileRequest {
+    string user_id = 1; // from jwt
+    string name = 2; // optional
+    string phone_number = 3; // optional
+}
+
+message UpdateUserProfileResponse {
+    User user = 1;
+    string message = 2;
+}
+
+// ChangePassword - Change current user's password
+message ChangePasswordRequest {
+    string user_id = 1; // from jwt
+    string old_password = 2;
+    string new_password = 3;
+}
+
+message ChangePasswordResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// ListUser - Get paginated list of users (for admin use)
+message ListUsersRequest {
+    int32 page = 1; // page number (1-indexed)
+    int32 page_size = 2; // number of users per page, default 10, max 100
+    string platform_role = 3; // optional filter by platform role
+    bool include_deleted = 4; // whether to include deleted users
+}
+
+message ListUsersResponse {
+    repeated User users = 1;
+    int32 total_count = 2; // total number of users matching the criteria
+    int32 current_page = 3; // current page number
+    int32 page_size = 4; // number of users per page
+    int32 total_pages = 5; // total number of pages
+}
+
+// SearchUsers - Search users by name or phone number (for admin use)
+message SearchUsersRequest {
+    string query = 1; // search query for name or phone number
+    int32 limit = 2; // max number of results to return, default 10, max 100
+}
+
+message SearchUsersResponse {
+    repeated User users = 1;
+    int32 total_count = 2; // total number of users matching the search
+}
+
+// DeleteUser - Soft delete a user by ID (for admin use)
+message DeleteUserRequest {
+    string user_id = 1;
+    string reason = 2; // reason for deletion
+}
+
+message DeleteUserResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// UdateUserRole - Change platform role of a user (for admin use)
+message UpdateUserRoleRequest {
+    string user_id = 1;
+    string new_platform_role = 2; // "Client" or "Merchant"
+}
+
+message UpdateUserRoleResponse {
+    User user = 1;
+    string message = 2;
+}
+
+message GetUserStatsRequest {}
+
+message GetUserStatsResponse {
+    int32 total_users = 1;
+    int32 total_deleted_users = 2;
+    int32 total_active_sessions = 3;
+    int32 users_by_role_client = 4;
+    int32 users_by_role_merchant = 5;
+    int32 users_by_role_admin = 6;
 }

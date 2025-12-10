@@ -40,8 +40,9 @@ func main() {
 	log.Println("Database connection established")
 
 	// 3. Initialize layers (bottom-up: Repository → Service → Handler)
-	repo := repository.NewPostgresUserRepository(dbpool)
-	svc := service.NewUserService(repo, cfg.JWTSecret, cfg.JWTExpiryHours)
+	userRepo := repository.NewPostgresUserRepository(dbpool)
+	refreshTokenRepo := repository.NewPostgresRefreshTokenRepository(dbpool)
+	svc := service.NewUserService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
 	hdl := handler.NewUserHandler(svc)
 
 	// 4. Setup gRPC server

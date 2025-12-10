@@ -27,6 +27,14 @@ type RefreshTokenRepository interface {
 
 	// CountActiveTokens return number of active tokens for a user
 	CountActivateTokens(ctx context.Context, userID string) (int, error)
+
+	// GetActiveTokensByUserID retrieves all active tokens for a user
+	GetActiveTokensByUserID(ctx context.Context, userID string) ([]*domain.RefreshToken, error)
+
+	// RevokeByID revokes all tokens for a user
+	RevokeByID(ctx context.Context, tokenID, reason string) error
+
+	CountAllActiveSessions(ctx context.Context) (int, error)
 }
 
 // postgresRefreshTokenRepository implements RefreshTokenRepository
@@ -166,5 +174,81 @@ func (r *postgresRefreshTokenRepository) CountActivateTokens(ctx context.Context
 		return 0, fmt.Errorf("failed to count active tokens: %w", err)
 	}
 
+	return count, nil
+}
+
+// GetActiveTokensByUserID retrieves all active tokens for a user
+func (r *postgresRefreshTokenRepository) GetActiveTokensByUserID(ctx context.Context, userID string) ([]*domain.RefreshToken, error) {
+	query := `
+		SELECT id, user_id, token_hash, expires_at, created_at, revoked_at, revoked_reason, device_info, ip_address
+		FROM refresh_tokens
+		WHERE user_id = $1
+			AND revoked_at IS NULL
+			AND expires_at > CURRENT_TIMESTAMP
+		ORDER BY created_at DESC
+	`
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get active tokens: %w", err)
+	}
+	defer rows.Close()
+
+	var tokens []*domain.RefreshToken
+	for rows.Next() {
+		var token domain.RefreshToken
+		err := rows.Scan(
+			&token.ID,
+			&token.UserID,
+			&token.TokenHash,
+			&token.ExpiresAt,
+			&token.CreatedAt,
+			&token.RevokedAt,
+			&token.RevokedReason,
+			&token.DeviceInfo,
+			&token.IPAddress,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan active token: %w", err)
+		}
+		tokens = append(tokens, &token)
+
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+	return tokens, nil
+}
+
+// RevokeByID revokes a refresh token by its ID
+func (r *postgresRefreshTokenRepository) RevokeByID(ctx context.Context, tokenID, reason string) error {
+	query := `
+		UPDATE refresh_tokens
+		SET revoked_at = CURRENT_TIMESTAMP, revoked_reason = $2
+		WHERE id = $1 AND revoked_at IS NULL
+	`
+	result, err := r.db.Exec(ctx, query, tokenID, reason)
+	if err != nil {
+		return fmt.Errorf("failed to revoke refresh token by ID: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("refresh token not found or already revoked")
+	}
+	return nil
+}
+
+// CountAllActiveSessions returns total number of active sessions across all users
+func (r *postgresRefreshTokenRepository) CountAllActiveSessions(ctx context.Context) (int, error) {
+	query := `
+        SELECT COUNT(*) 
+        FROM refresh_tokens 
+        WHERE revoked_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+    `
+	var count int
+	err := r.db.QueryRow(ctx, query).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count active sessions: %w", err)
+	}
 	return count, nil
 }
