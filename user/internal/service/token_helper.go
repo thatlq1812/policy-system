@@ -21,10 +21,14 @@ const (
 func (s *userService) generateAccessToken(userID, platformRole string) (string, int64, error) {
 	expiresAt := time.Now().Add(AccessTokenExpiry)
 
+	// Generate unique JTI (JWT ID) for token revocation
+	jti := uuid.New().String()
+
 	claims := jwt.MapClaims{
 		"user_id":       userID,
 		"platform_role": platformRole,
 		"type":          "access",
+		"jti":           jti, // Unique token ID for blacklist lookup
 		"exp":           expiresAt.Unix(),
 		"iat":           time.Now().Unix(),
 	}

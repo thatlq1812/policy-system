@@ -130,9 +130,9 @@ func main() {
 		public.GET("/policies/latest", documentAPI.GetLatestPolicy)
 	}
 
-	// Protected routes (require JWT authentication)
+	// Protected routes (require JWT authentication with blacklist check)
 	protected := router.Group("/api/v1")
-	protected.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	protected.Use(middleware.AuthMiddlewareWithBlacklist(cfg.JWT.Secret, userClient))
 	{
 		// User endpoints
 		protected.POST("/user/change-password", userAPI.ChangePassword)
@@ -145,11 +145,12 @@ func main() {
 		protected.POST("/consents/revoke", consentAPI.RevokeConsent)
 	}
 
-	// Admin routes (require JWT + Admin role)
-	// TODO: Add role-based authorization middleware
+	// Admin routes (require JWT + Admin role + blacklist check)
+	// IMPORTANT: AdminOnly middleware checks platform_role claim from JWT
+	// NOTE: Access tokens are now blacklisted on logout for immediate revocation
 	admin := router.Group("/api/v1/admin")
-	admin.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
-	// admin.Use(middleware.RequireRole("Admin")) // TODO: Implement role check
+	admin.Use(middleware.AuthMiddlewareWithBlacklist(cfg.JWT.Secret, userClient))
+	admin.Use(middleware.AdminOnly()) // FIXED: Added admin role check
 	{
 		// User management
 		admin.GET("/users", userAPI.ListUsers)

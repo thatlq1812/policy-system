@@ -42,7 +42,8 @@ func main() {
 	// 3. Initialize layers (bottom-up: Repository → Service → Handler)
 	userRepo := repository.NewPostgresUserRepository(dbpool)
 	refreshTokenRepo := repository.NewPostgresRefreshTokenRepository(dbpool)
-	svc := service.NewUserService(userRepo, refreshTokenRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
+	blacklistRepo := repository.NewPostgresTokenBlacklistRepository(dbpool) // NEW
+	svc := service.NewUserService(userRepo, refreshTokenRepo, blacklistRepo, cfg.JWTSecret, cfg.JWTExpiryHours)
 	hdl := handler.NewUserHandler(svc)
 
 	// 4. Setup gRPC server

@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/thatlq1812/policy-system/shared/pkg/validator"
 	"github.com/thatlq1812/policy-system/user/internal/domain"
 	"github.com/thatlq1812/policy-system/user/internal/repository"
 )
@@ -19,11 +20,11 @@ type UserService interface {
 
 	Login(ctx context.Context, phoneNumber, password string) (*domain.User, string, string, int64, int64, error)
 
-	// RefreshToken generates new access token from valid refresh token
-	RefreshToken(ctx context.Context, refreshToken string) (string, int64, error)
+	// RefreshToken generates new access token and rotates refresh token
+	RefreshToken(ctx context.Context, refreshToken string) (accessToken string, newRefreshToken string, accessExpiresAt int64, refreshExpiresAt int64, err error)
 
-	// Logout revokes a refresh token
-	Logout(ctx context.Context, refreshToken string) error
+	// Logout revokes a refresh token and optionally blacklists access token
+	Logout(ctx context.Context, refreshToken string, accessToken string) error
 
 	// GetUserProfile retrieves user profile by ID
 	GetUserProfile(ctx context.Context, userID string) (*domain.User, error)
@@ -45,6 +46,9 @@ type UserService interface {
 	//DeleteUser deletes a user by ID (soft delete)
 	DeleteUser(ctx context.Context, userId, reason string) error
 
+	// HardDeleteUser permanently deletes a user (for rollback scenarios only)
+	HardDeleteUser(ctx context.Context, userID string) error
+
 	//UpdateUserRole updates a user's platform role
 	UpdateUserRole(ctx context.Context, userID, newPlatformRole string) (*domain.User, error)
 
@@ -59,26 +63,32 @@ type UserService interface {
 
 	// GetUserStats retrieves user statistics
 	GetUserStats(ctx context.Context) (map[string]int, error)
+
+	// IsTokenBlacklisted checks if a token JTI is blacklisted
+	IsTokenBlacklisted(ctx context.Context, jti string) (bool, error)
 }
 
 // userService implements UserService
 type userService struct {
 	repo             repository.UserRepository
-	refreshTokenRepo repository.RefreshTokenRepository // NEW
+	refreshTokenRepo repository.RefreshTokenRepository
+	blacklistRepo    repository.TokenBlacklistRepository // NEW: For access token revocation
 	jwtSecret        string
-	jwtExpiryHours   int // Deprecated, use constants in token_helpers.go
+	jwtExpiryHours   int // Deprecated, use constants in token_helper.go
 }
 
 // NewUserService creates a new service instance
 func NewUserService(
 	repo repository.UserRepository,
-	refreshTokenRepo repository.RefreshTokenRepository, // NEW
+	refreshTokenRepo repository.RefreshTokenRepository,
+	blacklistRepo repository.TokenBlacklistRepository, // NEW
 	jwtSecret string,
 	jwtExpiryHours int,
 ) UserService {
 	return &userService{
 		repo:             repo,
 		refreshTokenRepo: refreshTokenRepo,
+		blacklistRepo:    blacklistRepo,
 		jwtSecret:        jwtSecret,
 		jwtExpiryHours:   jwtExpiryHours,
 	}
@@ -88,7 +98,7 @@ func NewUserService(
 func (s *userService) Register(ctx context.Context, phoneNumber, password, name, platformRole string) (*domain.User, string, string, int64, int64, error) {
 	// 1. Validate input
 	if err := s.validateRegisterInput(phoneNumber, password, platformRole); err != nil {
-		return nil, "", "", 0, 0, fmt.Errorf("validation failed: %w", err)
+		return nil, "", "", 0, 0, fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
 	}
 
 	// 2. Check if user already exists
@@ -97,7 +107,7 @@ func (s *userService) Register(ctx context.Context, phoneNumber, password, name,
 		return nil, "", "", 0, 0, fmt.Errorf("failed to check existing user: %w", err)
 	}
 	if existingUser != nil {
-		return nil, "", "", 0, 0, fmt.Errorf("user with phone number %s already exists", phoneNumber)
+		return nil, "", "", 0, 0, fmt.Errorf("%w: user with phone number %s", domain.ErrAlreadyExists, phoneNumber)
 	}
 
 	// 3. Hash password
@@ -146,7 +156,7 @@ func (s *userService) Register(ctx context.Context, phoneNumber, password, name,
 func (s *userService) Login(ctx context.Context, phoneNumber, password string) (*domain.User, string, string, int64, int64, error) {
 	// 1. Validate input
 	if phoneNumber == "" || password == "" {
-		return nil, "", "", 0, 0, fmt.Errorf("phone number and password are required")
+		return nil, "", "", 0, 0, fmt.Errorf("%w: phone number and password are required", domain.ErrInvalidInput)
 	}
 
 	// 2. Get user by phone number
@@ -155,12 +165,12 @@ func (s *userService) Login(ctx context.Context, phoneNumber, password string) (
 		return nil, "", "", 0, 0, fmt.Errorf("failed to get user: %w", err)
 	}
 	if user == nil {
-		return nil, "", "", 0, 0, fmt.Errorf("invalid credentials")
+		return nil, "", "", 0, 0, domain.ErrInvalidCredentials
 	}
 
 	// 3. Verify password
 	if err := s.verifyPassword(user.PasswordHash, password); err != nil {
-		return nil, "", "", 0, 0, fmt.Errorf("invalid credentials")
+		return nil, "", "", 0, 0, domain.ErrInvalidCredentials
 	}
 
 	// 4. Generate access token
@@ -188,58 +198,119 @@ func (s *userService) Login(ctx context.Context, phoneNumber, password string) (
 	return user, accessToken, refreshToken, accessExpiresAt, refreshExpiresAt.Unix(), nil
 }
 
-// RefreshToken generates new access token from valid refresh token
-func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (string, int64, error) {
+// RefreshToken generates new access token and rotates refresh token for security
+func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (string, string, int64, int64, error) {
 	// 1. Hash the provided refresh token
 	tokenHash := s.hashToken(refreshToken)
 
 	// 2. Get refresh token from database
 	storedToken, err := s.refreshTokenRepo.GetByTokenHash(ctx, tokenHash)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to get refresh token: %w", err)
+		return "", "", 0, 0, fmt.Errorf("failed to get refresh token: %w", err)
 	}
 	if storedToken == nil {
-		return "", 0, fmt.Errorf("invalid refresh token")
+		return "", "", 0, 0, fmt.Errorf("invalid refresh token")
 	}
 
 	// 3. Verify token is valid (not revoked, not expired)
 	if !storedToken.IsValid() {
 		if storedToken.IsRevoked() {
-			return "", 0, fmt.Errorf("refresh token has been revoked")
+			return "", "", 0, 0, fmt.Errorf("refresh token has been revoked")
 		}
-		return "", 0, fmt.Errorf("refresh token has expired")
+		return "", "", 0, 0, fmt.Errorf("refresh token has expired")
 	}
 
 	// 4. Get user to retrieve platform_role for new access token
 	user, err := s.repo.GetByID(ctx, storedToken.UserID)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to get user: %w", err)
+		return "", "", 0, 0, fmt.Errorf("failed to get user: %w", err)
 	}
 	if user == nil {
-		return "", 0, fmt.Errorf("user not found")
+		return "", "", 0, 0, fmt.Errorf("user not found")
 	}
 
 	// 5. Generate new access token
 	accessToken, accessExpiresAt, err := s.generateAccessToken(user.ID, user.PlatformRole)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to generate access token: %w", err)
+		return "", "", 0, 0, fmt.Errorf("failed to generate access token: %w", err)
 	}
 
-	// TODO: Optional - Token rotation (generate new refresh token and revoke old one)
-	// This improves security but adds DB write on every refresh
+	// 6. TOKEN ROTATION: Generate new refresh token and revoke old one
+	// This improves security - if old token is stolen, it becomes useless after one use
+	newRefreshToken := s.generateRefreshToken()
+	newRefreshTokenHash := s.hashToken(newRefreshToken)
+	newRefreshExpiresAt := time.Now().Add(RefreshTokenExpiry)
 
-	return accessToken, accessExpiresAt, nil
+	// Preserve device info and IP if available
+	deviceInfo := "token_refresh"
+	ipAddress := ""
+	if storedToken.DeviceInfo != nil {
+		deviceInfo = *storedToken.DeviceInfo
+	}
+	if storedToken.IPAddress != nil {
+		ipAddress = *storedToken.IPAddress
+	}
+
+	// Store new refresh token
+	_, err = s.refreshTokenRepo.Create(ctx, domain.CreateRefreshTokenParams{
+		UserID:     user.ID,
+		TokenHash:  newRefreshTokenHash,
+		ExpiresAt:  newRefreshExpiresAt,
+		DeviceInfo: deviceInfo,
+		IPAddress:  ipAddress,
+	})
+	if err != nil {
+		return "", "", 0, 0, fmt.Errorf("failed to store new refresh token: %w", err)
+	}
+
+	// Revoke old refresh token
+	err = s.refreshTokenRepo.Revoke(ctx, tokenHash, "token_rotation")
+	if err != nil {
+		// Log error but don't fail - new token is already issued
+		log.Printf("WARNING: Failed to revoke old refresh token during rotation: %v", err)
+	}
+
+	log.Printf("INFO: Token rotated for user %s (old token revoked)", user.ID)
+	return accessToken, newRefreshToken, accessExpiresAt, newRefreshExpiresAt.Unix(), nil
 }
 
-// Logout revokes a refresh token
-func (s *userService) Logout(ctx context.Context, refreshToken string) error {
+// Logout revokes a refresh token and blacklists access token
+func (s *userService) Logout(ctx context.Context, refreshToken string, accessToken string) error {
 	// 1. Hash the refresh token
 	tokenHash := s.hashToken(refreshToken)
 
-	// 2. Revoke the token in database
+	// 2. Revoke the refresh token in database
 	err := s.refreshTokenRepo.Revoke(ctx, tokenHash, "user_logout")
 	if err != nil {
 		return fmt.Errorf("failed to revoke refresh token: %w", err)
+	}
+
+	// 3. Blacklist the access token if provided
+	if accessToken != "" && s.blacklistRepo != nil {
+		// Parse access token to extract JTI and expiration
+		token, err := jwt.Parse(accessToken, func(token *jwt.Token) (interface{}, error) {
+			return []byte(s.jwtSecret), nil
+		})
+
+		if err == nil && token.Valid {
+			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+				jti, jtiOk := claims["jti"].(string)
+				userID, userIDOk := claims["user_id"].(string)
+				exp, expOk := claims["exp"].(float64)
+
+				if jtiOk && userIDOk && expOk {
+					expiresAt := time.Unix(int64(exp), 0)
+
+					// Add to blacklist
+					err := s.blacklistRepo.Add(ctx, jti, userID, expiresAt, "user_logout")
+					if err != nil {
+						// Log but don't fail logout - refresh token already revoked
+						log.Printf("WARNING: Failed to blacklist access token: %v", err)
+					}
+				}
+			}
+		}
+		// If token parsing fails, continue - refresh token is already revoked
 	}
 
 	return nil
@@ -248,7 +319,7 @@ func (s *userService) Logout(ctx context.Context, refreshToken string) error {
 // GetUserProfile retrieves user profile by ID
 func (s *userService) GetUserProfile(ctx context.Context, userID string) (*domain.User, error) {
 	if userID == "" {
-		return nil, fmt.Errorf("user ID is required")
+		return nil, fmt.Errorf("%w: user ID is required", domain.ErrInvalidInput)
 	}
 
 	user, err := s.repo.GetByID(ctx, userID)
@@ -258,7 +329,7 @@ func (s *userService) GetUserProfile(ctx context.Context, userID string) (*domai
 	}
 
 	if user == nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, domain.ErrNotFound
 	}
 
 	return user, nil
@@ -268,23 +339,23 @@ func (s *userService) GetUserProfile(ctx context.Context, userID string) (*domai
 func (s *userService) UpdateUserProfile(ctx context.Context, userID string, name, phoneNumber *string) (*domain.User, error) {
 	// Validate
 	if userID == "" {
-		return nil, fmt.Errorf("validation failed: user ID is required")
+		return nil, fmt.Errorf("%w: user ID is required", domain.ErrInvalidInput)
 	}
 
 	if name == nil && phoneNumber == nil {
-		return nil, fmt.Errorf("validation failed: at least one field to update must be provided")
+		return nil, fmt.Errorf("%w: at least one field to update must be provided", domain.ErrInvalidInput)
 	}
 
 	// Validate phone number if provided
 	if phoneNumber != nil {
 		if !isValidPhoneNumber(*phoneNumber) {
-			return nil, fmt.Errorf("validation failed: invalid phone number format")
+			return nil, fmt.Errorf("%w: invalid phone number format", domain.ErrInvalidInput)
 		}
 
 		// Check for uniqueness
 		existing, err := s.repo.GetByPhoneNumber(ctx, *phoneNumber)
 		if err == nil && existing.ID != userID {
-			return nil, fmt.Errorf("validation failed: phone number already in use")
+			return nil, fmt.Errorf("%w: phone number already in use", domain.ErrAlreadyExists)
 		}
 	}
 
@@ -305,11 +376,11 @@ func (s *userService) UpdateUserProfile(ctx context.Context, userID string, name
 func (s *userService) ChangePassword(ctx context.Context, userID, oldPassword, newPassword string) error {
 	// Validate
 	if userID == "" || oldPassword == "" || newPassword == "" {
-		return fmt.Errorf("validation failed: user ID, old password, and new password are required")
+		return fmt.Errorf("%w: user ID, old password, and new password are required", domain.ErrInvalidInput)
 	}
 
 	if err := validatePasswordStrength(newPassword); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+		return fmt.Errorf("%w: %v", domain.ErrInvalidInput, err)
 	}
 
 	// Get user and verify old password
@@ -320,7 +391,7 @@ func (s *userService) ChangePassword(ctx context.Context, userID, oldPassword, n
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword))
 	if err != nil {
-		return fmt.Errorf("invalid credentials: old password is incorrect")
+		return domain.ErrInvalidCredentials
 	}
 
 	// Hash new password
@@ -379,7 +450,7 @@ func (s *userService) ListUsers(ctx context.Context, page, pageSize int, platfor
 // SearchUsers searches users by name or phone number
 func (s *userService) SearchUsers(ctx context.Context, query string, limit int) ([]*domain.User, error) {
 	if query == "" {
-		return nil, fmt.Errorf("validation failed: query is required")
+		return nil, fmt.Errorf("%w: query is required", domain.ErrInvalidInput)
 	}
 
 	if limit < 1 {
@@ -396,7 +467,7 @@ func (s *userService) SearchUsers(ctx context.Context, query string, limit int) 
 // DeleteUser performs a soft delete of a user and revokes all tokens of the user
 func (s *userService) DeleteUser(ctx context.Context, userID, reason string) error {
 	if userID == "" {
-		return fmt.Errorf("validation failed: user ID is required")
+		return fmt.Errorf("%w: user ID is required", domain.ErrInvalidInput)
 	}
 
 	// Soft delete user
@@ -415,14 +486,32 @@ func (s *userService) DeleteUser(ctx context.Context, userID, reason string) err
 	return nil
 }
 
+// HardDeleteUser permanently removes a user from database
+// WARNING: This should ONLY be used for transaction rollback scenarios
+// Regular deletions must use DeleteUser (soft delete) to preserve audit trail
+func (s *userService) HardDeleteUser(ctx context.Context, userID string) error {
+	if userID == "" {
+		return fmt.Errorf("%w: user ID is required", domain.ErrInvalidInput)
+	}
+
+	// Hard delete user (no audit trail preserved)
+	err := s.repo.HardDelete(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to hard delete user: %w", err)
+	}
+
+	log.Printf("WARNING: User %s permanently deleted (hard delete)", userID)
+	return nil
+}
+
 // UpdateUserRole updates user's platform role
 func (s *userService) UpdateUserRole(ctx context.Context, userID, newPlatformRole string) (*domain.User, error) {
 	if userID == "" {
-		return nil, fmt.Errorf("validation failed: user ID is required")
+		return nil, fmt.Errorf("%w: user ID is required", domain.ErrInvalidInput)
 	}
 
 	if !isValidPlatformRole(newPlatformRole) {
-		return nil, fmt.Errorf("validation failed: invalid platform role (must be 'Client' or 'Merchant' or 'Admin')")
+		return nil, fmt.Errorf("%w: invalid platform role (must be 'Client' or 'Merchant' or 'Admin')", domain.ErrInvalidInput)
 	}
 
 	// Update user role in repository
@@ -506,20 +595,9 @@ func (s *userService) RevokeSession(ctx context.Context, userID, tokenID string)
 }
 
 // Helpers
+// isValidPhoneNumber validates phone number using shared validator
 func isValidPhoneNumber(phone string) bool {
-	// Simple validation: check length and numeric
-	if len(phone) < 10 || len(phone) > 15 {
-		return false
-	}
-	if phone[0] != '0' {
-		return false
-	}
-	for _, c := range phone {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
+	return validator.ValidatePhoneNumber(phone) == nil
 }
 
 // GetUserStats returns statistics about user accounts
@@ -541,25 +619,38 @@ func (s *userService) GetUserStats(ctx context.Context) (map[string]int, error) 
 }
 
 func validatePasswordStrength(password string) error {
-	if len(password) < 6 {
-		return fmt.Errorf("password must be at least 6 characters long")
-	}
-	// Can add more checks (uppercase, digits, special chars) if needed
-	return nil
+	// Use basic strength for backward compatibility
+	// TODO: Upgrade to DefaultPasswordStrength() for better security
+	return validator.ValidatePassword(password, validator.BasicPasswordStrength())
 }
 
-// validateRegisterInput validates registration parameters
+// IsTokenBlacklisted checks if a token JTI is in the blacklist
+func (s *userService) IsTokenBlacklisted(ctx context.Context, jti string) (bool, error) {
+	if s.blacklistRepo == nil {
+		// If blacklist is not configured, tokens are never blacklisted
+		return false, nil
+	}
+
+	isBlacklisted, err := s.blacklistRepo.IsBlacklisted(ctx, jti)
+	if err != nil {
+		return false, fmt.Errorf("failed to check token blacklist: %w", err)
+	}
+
+	return isBlacklisted, nil
+}
+
+// validateRegisterInput validates registration parameters using shared validator
 func (s *userService) validateRegisterInput(phoneNumber, password, platformRole string) error {
-	if phoneNumber == "" {
-		return fmt.Errorf("phone number is required")
+	if err := validator.ValidatePhoneNumber(phoneNumber); err != nil {
+		return err
 	}
 
-	if len(password) < 6 {
-		return fmt.Errorf("password must be at least 6 characters")
+	if err := validatePasswordStrength(password); err != nil {
+		return err
 	}
 
-	if platformRole != "Client" && platformRole != "Merchant" && platformRole != "Admin" {
-		return fmt.Errorf("platform_role must be one of: 'Client', 'Merchant', or 'Admin'")
+	if err := validator.ValidatePlatformRole(platformRole); err != nil {
+		return err
 	}
 
 	return nil
@@ -598,5 +689,5 @@ func (s *userService) generateJWT(userID, platformRole string) (string, error) {
 }
 
 func isValidPlatformRole(role string) bool {
-	return role == "Client" || role == "Merchant" || role == "Admin"
+	return validator.ValidatePlatformRole(role) == nil
 }

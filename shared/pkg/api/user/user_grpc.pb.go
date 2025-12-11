@@ -19,21 +19,23 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_Register_FullMethodName          = "/user.UserService/Register"
-	UserService_Login_FullMethodName             = "/user.UserService/Login"
-	UserService_RefreshToken_FullMethodName      = "/user.UserService/RefreshToken"
-	UserService_Logout_FullMethodName            = "/user.UserService/Logout"
-	UserService_GetUserProfile_FullMethodName    = "/user.UserService/GetUserProfile"
-	UserService_UpdateUserProfile_FullMethodName = "/user.UserService/UpdateUserProfile"
-	UserService_ChangePassword_FullMethodName    = "/user.UserService/ChangePassword"
-	UserService_ListUsers_FullMethodName         = "/user.UserService/ListUsers"
-	UserService_SearchUsers_FullMethodName       = "/user.UserService/SearchUsers"
-	UserService_DeleteUser_FullMethodName        = "/user.UserService/DeleteUser"
-	UserService_UpdateUserRole_FullMethodName    = "/user.UserService/UpdateUserRole"
-	UserService_GetActiveSessions_FullMethodName = "/user.UserService/GetActiveSessions"
-	UserService_LogoutAllDevices_FullMethodName  = "/user.UserService/LogoutAllDevices"
-	UserService_RevokeSession_FullMethodName     = "/user.UserService/RevokeSession"
-	UserService_GetUserStats_FullMethodName      = "/user.UserService/GetUserStats"
+	UserService_Register_FullMethodName           = "/user.UserService/Register"
+	UserService_Login_FullMethodName              = "/user.UserService/Login"
+	UserService_RefreshToken_FullMethodName       = "/user.UserService/RefreshToken"
+	UserService_Logout_FullMethodName             = "/user.UserService/Logout"
+	UserService_GetUserProfile_FullMethodName     = "/user.UserService/GetUserProfile"
+	UserService_UpdateUserProfile_FullMethodName  = "/user.UserService/UpdateUserProfile"
+	UserService_ChangePassword_FullMethodName     = "/user.UserService/ChangePassword"
+	UserService_ListUsers_FullMethodName          = "/user.UserService/ListUsers"
+	UserService_SearchUsers_FullMethodName        = "/user.UserService/SearchUsers"
+	UserService_DeleteUser_FullMethodName         = "/user.UserService/DeleteUser"
+	UserService_HardDeleteUser_FullMethodName     = "/user.UserService/HardDeleteUser"
+	UserService_UpdateUserRole_FullMethodName     = "/user.UserService/UpdateUserRole"
+	UserService_GetActiveSessions_FullMethodName  = "/user.UserService/GetActiveSessions"
+	UserService_LogoutAllDevices_FullMethodName   = "/user.UserService/LogoutAllDevices"
+	UserService_RevokeSession_FullMethodName      = "/user.UserService/RevokeSession"
+	UserService_GetUserStats_FullMethodName       = "/user.UserService/GetUserStats"
+	UserService_IsTokenBlacklisted_FullMethodName = "/user.UserService/IsTokenBlacklisted"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -54,6 +56,7 @@ type UserServiceClient interface {
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
 	SearchUsers(ctx context.Context, in *SearchUsersRequest, opts ...grpc.CallOption) (*SearchUsersResponse, error)
 	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
+	HardDeleteUser(ctx context.Context, in *HardDeleteUserRequest, opts ...grpc.CallOption) (*HardDeleteUserResponse, error)
 	UpdateUserRole(ctx context.Context, in *UpdateUserRoleRequest, opts ...grpc.CallOption) (*UpdateUserRoleResponse, error)
 	// Session management
 	GetActiveSessions(ctx context.Context, in *GetActiveSessionsRequest, opts ...grpc.CallOption) (*GetActiveSessionsResponse, error)
@@ -61,6 +64,8 @@ type UserServiceClient interface {
 	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
 	// Account statistics
 	GetUserStats(ctx context.Context, in *GetUserStatsRequest, opts ...grpc.CallOption) (*GetUserStatsResponse, error)
+	// Token blacklist operations (for Gateway middleware)
+	IsTokenBlacklisted(ctx context.Context, in *IsTokenBlacklistedRequest, opts ...grpc.CallOption) (*IsTokenBlacklistedResponse, error)
 }
 
 type userServiceClient struct {
@@ -171,6 +176,16 @@ func (c *userServiceClient) DeleteUser(ctx context.Context, in *DeleteUserReques
 	return out, nil
 }
 
+func (c *userServiceClient) HardDeleteUser(ctx context.Context, in *HardDeleteUserRequest, opts ...grpc.CallOption) (*HardDeleteUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HardDeleteUserResponse)
+	err := c.cc.Invoke(ctx, UserService_HardDeleteUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) UpdateUserRole(ctx context.Context, in *UpdateUserRoleRequest, opts ...grpc.CallOption) (*UpdateUserRoleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateUserRoleResponse)
@@ -221,6 +236,16 @@ func (c *userServiceClient) GetUserStats(ctx context.Context, in *GetUserStatsRe
 	return out, nil
 }
 
+func (c *userServiceClient) IsTokenBlacklisted(ctx context.Context, in *IsTokenBlacklistedRequest, opts ...grpc.CallOption) (*IsTokenBlacklistedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IsTokenBlacklistedResponse)
+	err := c.cc.Invoke(ctx, UserService_IsTokenBlacklisted_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServiceServer is the server API for UserService service.
 // All implementations must embed UnimplementedUserServiceServer
 // for forward compatibility.
@@ -239,6 +264,7 @@ type UserServiceServer interface {
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
 	SearchUsers(context.Context, *SearchUsersRequest) (*SearchUsersResponse, error)
 	DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
+	HardDeleteUser(context.Context, *HardDeleteUserRequest) (*HardDeleteUserResponse, error)
 	UpdateUserRole(context.Context, *UpdateUserRoleRequest) (*UpdateUserRoleResponse, error)
 	// Session management
 	GetActiveSessions(context.Context, *GetActiveSessionsRequest) (*GetActiveSessionsResponse, error)
@@ -246,6 +272,8 @@ type UserServiceServer interface {
 	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
 	// Account statistics
 	GetUserStats(context.Context, *GetUserStatsRequest) (*GetUserStatsResponse, error)
+	// Token blacklist operations (for Gateway middleware)
+	IsTokenBlacklisted(context.Context, *IsTokenBlacklistedRequest) (*IsTokenBlacklistedResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -286,6 +314,9 @@ func (UnimplementedUserServiceServer) SearchUsers(context.Context, *SearchUsersR
 func (UnimplementedUserServiceServer) DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteUser not implemented")
 }
+func (UnimplementedUserServiceServer) HardDeleteUser(context.Context, *HardDeleteUserRequest) (*HardDeleteUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method HardDeleteUser not implemented")
+}
 func (UnimplementedUserServiceServer) UpdateUserRole(context.Context, *UpdateUserRoleRequest) (*UpdateUserRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateUserRole not implemented")
 }
@@ -300,6 +331,9 @@ func (UnimplementedUserServiceServer) RevokeSession(context.Context, *RevokeSess
 }
 func (UnimplementedUserServiceServer) GetUserStats(context.Context, *GetUserStatsRequest) (*GetUserStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUserStats not implemented")
+}
+func (UnimplementedUserServiceServer) IsTokenBlacklisted(context.Context, *IsTokenBlacklistedRequest) (*IsTokenBlacklistedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method IsTokenBlacklisted not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
 func (UnimplementedUserServiceServer) testEmbeddedByValue()                     {}
@@ -502,6 +536,24 @@ func _UserService_DeleteUser_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_HardDeleteUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HardDeleteUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).HardDeleteUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_HardDeleteUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).HardDeleteUser(ctx, req.(*HardDeleteUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_UpdateUserRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateUserRoleRequest)
 	if err := dec(in); err != nil {
@@ -592,6 +644,24 @@ func _UserService_GetUserStats_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_IsTokenBlacklisted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsTokenBlacklistedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).IsTokenBlacklisted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_IsTokenBlacklisted_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).IsTokenBlacklisted(ctx, req.(*IsTokenBlacklistedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UserService_ServiceDesc is the grpc.ServiceDesc for UserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -640,6 +710,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UserService_DeleteUser_Handler,
 		},
 		{
+			MethodName: "HardDeleteUser",
+			Handler:    _UserService_HardDeleteUser_Handler,
+		},
+		{
 			MethodName: "UpdateUserRole",
 			Handler:    _UserService_UpdateUserRole_Handler,
 		},
@@ -658,6 +732,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUserStats",
 			Handler:    _UserService_GetUserStats_Handler,
+		},
+		{
+			MethodName: "IsTokenBlacklisted",
+			Handler:    _UserService_IsTokenBlacklisted_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

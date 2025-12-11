@@ -877,10 +877,11 @@ func (x *RefreshTokenResponse) GetRefreshTokenExpiresAt() int64 {
 	return 0
 }
 
-// LogoutRequest - Client sends refresh token to logout
+// LogoutRequest - Client sends refresh token and optionally access token to logout
 type LogoutRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"` // Required: refresh token to revoke
+	AccessToken   string                 `protobuf:"bytes,2,opt,name=access_token,json=accessToken,proto3" json:"access_token,omitempty"`    // Optional: access token to blacklist for immediate revocation
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -918,6 +919,13 @@ func (*LogoutRequest) Descriptor() ([]byte, []int) {
 func (x *LogoutRequest) GetRefreshToken() string {
 	if x != nil {
 		return x.RefreshToken
+	}
+	return ""
+}
+
+func (x *LogoutRequest) GetAccessToken() string {
+	if x != nil {
+		return x.AccessToken
 	}
 	return ""
 }
@@ -1645,6 +1653,103 @@ func (x *DeleteUserResponse) GetMessage() string {
 	return ""
 }
 
+// HardDeleteUser - Permanently delete a user (for rollback scenarios ONLY)
+type HardDeleteUserRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HardDeleteUserRequest) Reset() {
+	*x = HardDeleteUserRequest{}
+	mi := &file_pkg_api_user_user_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HardDeleteUserRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HardDeleteUserRequest) ProtoMessage() {}
+
+func (x *HardDeleteUserRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_user_user_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HardDeleteUserRequest.ProtoReflect.Descriptor instead.
+func (*HardDeleteUserRequest) Descriptor() ([]byte, []int) {
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *HardDeleteUserRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type HardDeleteUserResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HardDeleteUserResponse) Reset() {
+	*x = HardDeleteUserResponse{}
+	mi := &file_pkg_api_user_user_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HardDeleteUserResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HardDeleteUserResponse) ProtoMessage() {}
+
+func (x *HardDeleteUserResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_user_user_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HardDeleteUserResponse.ProtoReflect.Descriptor instead.
+func (*HardDeleteUserResponse) Descriptor() ([]byte, []int) {
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *HardDeleteUserResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *HardDeleteUserResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 // UdateUserRole - Change platform role of a user (for admin use)
 type UpdateUserRoleRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -1656,7 +1761,7 @@ type UpdateUserRoleRequest struct {
 
 func (x *UpdateUserRoleRequest) Reset() {
 	*x = UpdateUserRoleRequest{}
-	mi := &file_pkg_api_user_user_proto_msgTypes[28]
+	mi := &file_pkg_api_user_user_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1668,7 +1773,7 @@ func (x *UpdateUserRoleRequest) String() string {
 func (*UpdateUserRoleRequest) ProtoMessage() {}
 
 func (x *UpdateUserRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_user_user_proto_msgTypes[28]
+	mi := &file_pkg_api_user_user_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1681,7 +1786,7 @@ func (x *UpdateUserRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserRoleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserRoleRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{28}
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *UpdateUserRoleRequest) GetUserId() string {
@@ -1708,7 +1813,7 @@ type UpdateUserRoleResponse struct {
 
 func (x *UpdateUserRoleResponse) Reset() {
 	*x = UpdateUserRoleResponse{}
-	mi := &file_pkg_api_user_user_proto_msgTypes[29]
+	mi := &file_pkg_api_user_user_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1720,7 +1825,7 @@ func (x *UpdateUserRoleResponse) String() string {
 func (*UpdateUserRoleResponse) ProtoMessage() {}
 
 func (x *UpdateUserRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_user_user_proto_msgTypes[29]
+	mi := &file_pkg_api_user_user_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1733,7 +1838,7 @@ func (x *UpdateUserRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateUserRoleResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserRoleResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{29}
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *UpdateUserRoleResponse) GetUser() *User {
@@ -1758,7 +1863,7 @@ type GetUserStatsRequest struct {
 
 func (x *GetUserStatsRequest) Reset() {
 	*x = GetUserStatsRequest{}
-	mi := &file_pkg_api_user_user_proto_msgTypes[30]
+	mi := &file_pkg_api_user_user_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1770,7 +1875,7 @@ func (x *GetUserStatsRequest) String() string {
 func (*GetUserStatsRequest) ProtoMessage() {}
 
 func (x *GetUserStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_user_user_proto_msgTypes[30]
+	mi := &file_pkg_api_user_user_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1783,7 +1888,7 @@ func (x *GetUserStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserStatsRequest) Descriptor() ([]byte, []int) {
-	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{30}
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{32}
 }
 
 type GetUserStatsResponse struct {
@@ -1800,7 +1905,7 @@ type GetUserStatsResponse struct {
 
 func (x *GetUserStatsResponse) Reset() {
 	*x = GetUserStatsResponse{}
-	mi := &file_pkg_api_user_user_proto_msgTypes[31]
+	mi := &file_pkg_api_user_user_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1812,7 +1917,7 @@ func (x *GetUserStatsResponse) String() string {
 func (*GetUserStatsResponse) ProtoMessage() {}
 
 func (x *GetUserStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_pkg_api_user_user_proto_msgTypes[31]
+	mi := &file_pkg_api_user_user_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1825,7 +1930,7 @@ func (x *GetUserStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserStatsResponse) Descriptor() ([]byte, []int) {
-	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{31}
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetUserStatsResponse) GetTotalUsers() int32 {
@@ -1868,6 +1973,95 @@ func (x *GetUserStatsResponse) GetUsersByRoleAdmin() int32 {
 		return x.UsersByRoleAdmin
 	}
 	return 0
+}
+
+// IsTokenBlacklisted - Check if a token JTI is blacklisted
+type IsTokenBlacklistedRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Jti           string                 `protobuf:"bytes,1,opt,name=jti,proto3" json:"jti,omitempty"` // JWT ID to check
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IsTokenBlacklistedRequest) Reset() {
+	*x = IsTokenBlacklistedRequest{}
+	mi := &file_pkg_api_user_user_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IsTokenBlacklistedRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IsTokenBlacklistedRequest) ProtoMessage() {}
+
+func (x *IsTokenBlacklistedRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_user_user_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IsTokenBlacklistedRequest.ProtoReflect.Descriptor instead.
+func (*IsTokenBlacklistedRequest) Descriptor() ([]byte, []int) {
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *IsTokenBlacklistedRequest) GetJti() string {
+	if x != nil {
+		return x.Jti
+	}
+	return ""
+}
+
+type IsTokenBlacklistedResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IsBlacklisted bool                   `protobuf:"varint,1,opt,name=is_blacklisted,json=isBlacklisted,proto3" json:"is_blacklisted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IsTokenBlacklistedResponse) Reset() {
+	*x = IsTokenBlacklistedResponse{}
+	mi := &file_pkg_api_user_user_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IsTokenBlacklistedResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IsTokenBlacklistedResponse) ProtoMessage() {}
+
+func (x *IsTokenBlacklistedResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_pkg_api_user_user_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IsTokenBlacklistedResponse.ProtoReflect.Descriptor instead.
+func (*IsTokenBlacklistedResponse) Descriptor() ([]byte, []int) {
+	return file_pkg_api_user_user_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *IsTokenBlacklistedResponse) GetIsBlacklisted() bool {
+	if x != nil {
+		return x.IsBlacklisted
+	}
+	return false
 }
 
 var File_pkg_api_user_user_proto protoreflect.FileDescriptor
@@ -1940,9 +2134,10 @@ const file_pkg_api_user_user_proto_rawDesc = "" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x125\n" +
 	"\x17access_token_expires_at\x18\x03 \x01(\x03R\x14accessTokenExpiresAt\x127\n" +
-	"\x18refresh_token_expires_at\x18\x04 \x01(\x03R\x15refreshTokenExpiresAt\"4\n" +
+	"\x18refresh_token_expires_at\x18\x04 \x01(\x03R\x15refreshTokenExpiresAt\"W\n" +
 	"\rLogoutRequest\x12#\n" +
-	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"D\n" +
+	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\x12!\n" +
+	"\faccess_token\x18\x02 \x01(\tR\vaccessToken\"D\n" +
 	"\x0eLogoutResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"0\n" +
@@ -1993,6 +2188,11 @@ const file_pkg_api_user_user_proto_rawDesc = "" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason\"H\n" +
 	"\x12DeleteUserResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"0\n" +
+	"\x15HardDeleteUserRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"L\n" +
+	"\x16HardDeleteUserResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\\\n" +
 	"\x15UpdateUserRoleRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12*\n" +
@@ -2009,7 +2209,11 @@ const file_pkg_api_user_user_proto_rawDesc = "" +
 	"\x15total_active_sessions\x18\x03 \x01(\x05R\x13totalActiveSessions\x12/\n" +
 	"\x14users_by_role_client\x18\x04 \x01(\x05R\x11usersByRoleClient\x123\n" +
 	"\x16users_by_role_merchant\x18\x05 \x01(\x05R\x13usersByRoleMerchant\x12-\n" +
-	"\x13users_by_role_admin\x18\x06 \x01(\x05R\x10usersByRoleAdmin2\xb0\b\n" +
+	"\x13users_by_role_admin\x18\x06 \x01(\x05R\x10usersByRoleAdmin\"-\n" +
+	"\x19IsTokenBlacklistedRequest\x12\x10\n" +
+	"\x03jti\x18\x01 \x01(\tR\x03jti\"C\n" +
+	"\x1aIsTokenBlacklistedResponse\x12%\n" +
+	"\x0eis_blacklisted\x18\x01 \x01(\bR\risBlacklisted2\xd6\t\n" +
 	"\vUserService\x129\n" +
 	"\bRegister\x12\x15.user.RegisterRequest\x1a\x16.user.RegisterResponse\x120\n" +
 	"\x05Login\x12\x12.user.LoginRequest\x1a\x13.user.LoginResponse\x12E\n" +
@@ -2022,11 +2226,13 @@ const file_pkg_api_user_user_proto_rawDesc = "" +
 	"\vSearchUsers\x12\x18.user.SearchUsersRequest\x1a\x19.user.SearchUsersResponse\x12?\n" +
 	"\n" +
 	"DeleteUser\x12\x17.user.DeleteUserRequest\x1a\x18.user.DeleteUserResponse\x12K\n" +
+	"\x0eHardDeleteUser\x12\x1b.user.HardDeleteUserRequest\x1a\x1c.user.HardDeleteUserResponse\x12K\n" +
 	"\x0eUpdateUserRole\x12\x1b.user.UpdateUserRoleRequest\x1a\x1c.user.UpdateUserRoleResponse\x12T\n" +
 	"\x11GetActiveSessions\x12\x1e.user.GetActiveSessionsRequest\x1a\x1f.user.GetActiveSessionsResponse\x12Q\n" +
 	"\x10LogoutAllDevices\x12\x1d.user.LogoutAllDevicesRequest\x1a\x1e.user.LogoutAllDevicesResponse\x12H\n" +
 	"\rRevokeSession\x12\x1a.user.RevokeSessionRequest\x1a\x1b.user.RevokeSessionResponse\x12E\n" +
-	"\fGetUserStats\x12\x19.user.GetUserStatsRequest\x1a\x1a.user.GetUserStatsResponseB9Z7github.com/thatlq1812/policy-system/shared/pkg/api/userb\x06proto3"
+	"\fGetUserStats\x12\x19.user.GetUserStatsRequest\x1a\x1a.user.GetUserStatsResponse\x12W\n" +
+	"\x12IsTokenBlacklisted\x12\x1f.user.IsTokenBlacklistedRequest\x1a .user.IsTokenBlacklistedResponseB9Z7github.com/thatlq1812/policy-system/shared/pkg/api/userb\x06proto3"
 
 var (
 	file_pkg_api_user_user_proto_rawDescOnce sync.Once
@@ -2040,40 +2246,44 @@ func file_pkg_api_user_user_proto_rawDescGZIP() []byte {
 	return file_pkg_api_user_user_proto_rawDescData
 }
 
-var file_pkg_api_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_pkg_api_user_user_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_pkg_api_user_user_proto_goTypes = []any{
-	(*User)(nil),                      // 0: user.User
-	(*RegisterRequest)(nil),           // 1: user.RegisterRequest
-	(*RegisterResponse)(nil),          // 2: user.RegisterResponse
-	(*LoginRequest)(nil),              // 3: user.LoginRequest
-	(*LoginResponse)(nil),             // 4: user.LoginResponse
-	(*RefreshTokenInfo)(nil),          // 5: user.RefreshTokenInfo
-	(*GetActiveSessionsRequest)(nil),  // 6: user.GetActiveSessionsRequest
-	(*GetActiveSessionsResponse)(nil), // 7: user.GetActiveSessionsResponse
-	(*LogoutAllDevicesRequest)(nil),   // 8: user.LogoutAllDevicesRequest
-	(*LogoutAllDevicesResponse)(nil),  // 9: user.LogoutAllDevicesResponse
-	(*RevokeSessionRequest)(nil),      // 10: user.RevokeSessionRequest
-	(*RevokeSessionResponse)(nil),     // 11: user.RevokeSessionResponse
-	(*RefreshTokenRequest)(nil),       // 12: user.RefreshTokenRequest
-	(*RefreshTokenResponse)(nil),      // 13: user.RefreshTokenResponse
-	(*LogoutRequest)(nil),             // 14: user.LogoutRequest
-	(*LogoutResponse)(nil),            // 15: user.LogoutResponse
-	(*GetUserProfileRequest)(nil),     // 16: user.GetUserProfileRequest
-	(*GetUserProfileResponse)(nil),    // 17: user.GetUserProfileResponse
-	(*UpdateUserProfileRequest)(nil),  // 18: user.UpdateUserProfileRequest
-	(*UpdateUserProfileResponse)(nil), // 19: user.UpdateUserProfileResponse
-	(*ChangePasswordRequest)(nil),     // 20: user.ChangePasswordRequest
-	(*ChangePasswordResponse)(nil),    // 21: user.ChangePasswordResponse
-	(*ListUsersRequest)(nil),          // 22: user.ListUsersRequest
-	(*ListUsersResponse)(nil),         // 23: user.ListUsersResponse
-	(*SearchUsersRequest)(nil),        // 24: user.SearchUsersRequest
-	(*SearchUsersResponse)(nil),       // 25: user.SearchUsersResponse
-	(*DeleteUserRequest)(nil),         // 26: user.DeleteUserRequest
-	(*DeleteUserResponse)(nil),        // 27: user.DeleteUserResponse
-	(*UpdateUserRoleRequest)(nil),     // 28: user.UpdateUserRoleRequest
-	(*UpdateUserRoleResponse)(nil),    // 29: user.UpdateUserRoleResponse
-	(*GetUserStatsRequest)(nil),       // 30: user.GetUserStatsRequest
-	(*GetUserStatsResponse)(nil),      // 31: user.GetUserStatsResponse
+	(*User)(nil),                       // 0: user.User
+	(*RegisterRequest)(nil),            // 1: user.RegisterRequest
+	(*RegisterResponse)(nil),           // 2: user.RegisterResponse
+	(*LoginRequest)(nil),               // 3: user.LoginRequest
+	(*LoginResponse)(nil),              // 4: user.LoginResponse
+	(*RefreshTokenInfo)(nil),           // 5: user.RefreshTokenInfo
+	(*GetActiveSessionsRequest)(nil),   // 6: user.GetActiveSessionsRequest
+	(*GetActiveSessionsResponse)(nil),  // 7: user.GetActiveSessionsResponse
+	(*LogoutAllDevicesRequest)(nil),    // 8: user.LogoutAllDevicesRequest
+	(*LogoutAllDevicesResponse)(nil),   // 9: user.LogoutAllDevicesResponse
+	(*RevokeSessionRequest)(nil),       // 10: user.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),      // 11: user.RevokeSessionResponse
+	(*RefreshTokenRequest)(nil),        // 12: user.RefreshTokenRequest
+	(*RefreshTokenResponse)(nil),       // 13: user.RefreshTokenResponse
+	(*LogoutRequest)(nil),              // 14: user.LogoutRequest
+	(*LogoutResponse)(nil),             // 15: user.LogoutResponse
+	(*GetUserProfileRequest)(nil),      // 16: user.GetUserProfileRequest
+	(*GetUserProfileResponse)(nil),     // 17: user.GetUserProfileResponse
+	(*UpdateUserProfileRequest)(nil),   // 18: user.UpdateUserProfileRequest
+	(*UpdateUserProfileResponse)(nil),  // 19: user.UpdateUserProfileResponse
+	(*ChangePasswordRequest)(nil),      // 20: user.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),     // 21: user.ChangePasswordResponse
+	(*ListUsersRequest)(nil),           // 22: user.ListUsersRequest
+	(*ListUsersResponse)(nil),          // 23: user.ListUsersResponse
+	(*SearchUsersRequest)(nil),         // 24: user.SearchUsersRequest
+	(*SearchUsersResponse)(nil),        // 25: user.SearchUsersResponse
+	(*DeleteUserRequest)(nil),          // 26: user.DeleteUserRequest
+	(*DeleteUserResponse)(nil),         // 27: user.DeleteUserResponse
+	(*HardDeleteUserRequest)(nil),      // 28: user.HardDeleteUserRequest
+	(*HardDeleteUserResponse)(nil),     // 29: user.HardDeleteUserResponse
+	(*UpdateUserRoleRequest)(nil),      // 30: user.UpdateUserRoleRequest
+	(*UpdateUserRoleResponse)(nil),     // 31: user.UpdateUserRoleResponse
+	(*GetUserStatsRequest)(nil),        // 32: user.GetUserStatsRequest
+	(*GetUserStatsResponse)(nil),       // 33: user.GetUserStatsResponse
+	(*IsTokenBlacklistedRequest)(nil),  // 34: user.IsTokenBlacklistedRequest
+	(*IsTokenBlacklistedResponse)(nil), // 35: user.IsTokenBlacklistedResponse
 }
 var file_pkg_api_user_user_proto_depIdxs = []int32{
 	0,  // 0: user.RegisterResponse.user:type_name -> user.User
@@ -2094,28 +2304,32 @@ var file_pkg_api_user_user_proto_depIdxs = []int32{
 	22, // 15: user.UserService.ListUsers:input_type -> user.ListUsersRequest
 	24, // 16: user.UserService.SearchUsers:input_type -> user.SearchUsersRequest
 	26, // 17: user.UserService.DeleteUser:input_type -> user.DeleteUserRequest
-	28, // 18: user.UserService.UpdateUserRole:input_type -> user.UpdateUserRoleRequest
-	6,  // 19: user.UserService.GetActiveSessions:input_type -> user.GetActiveSessionsRequest
-	8,  // 20: user.UserService.LogoutAllDevices:input_type -> user.LogoutAllDevicesRequest
-	10, // 21: user.UserService.RevokeSession:input_type -> user.RevokeSessionRequest
-	30, // 22: user.UserService.GetUserStats:input_type -> user.GetUserStatsRequest
-	2,  // 23: user.UserService.Register:output_type -> user.RegisterResponse
-	4,  // 24: user.UserService.Login:output_type -> user.LoginResponse
-	13, // 25: user.UserService.RefreshToken:output_type -> user.RefreshTokenResponse
-	15, // 26: user.UserService.Logout:output_type -> user.LogoutResponse
-	17, // 27: user.UserService.GetUserProfile:output_type -> user.GetUserProfileResponse
-	19, // 28: user.UserService.UpdateUserProfile:output_type -> user.UpdateUserProfileResponse
-	21, // 29: user.UserService.ChangePassword:output_type -> user.ChangePasswordResponse
-	23, // 30: user.UserService.ListUsers:output_type -> user.ListUsersResponse
-	25, // 31: user.UserService.SearchUsers:output_type -> user.SearchUsersResponse
-	27, // 32: user.UserService.DeleteUser:output_type -> user.DeleteUserResponse
-	29, // 33: user.UserService.UpdateUserRole:output_type -> user.UpdateUserRoleResponse
-	7,  // 34: user.UserService.GetActiveSessions:output_type -> user.GetActiveSessionsResponse
-	9,  // 35: user.UserService.LogoutAllDevices:output_type -> user.LogoutAllDevicesResponse
-	11, // 36: user.UserService.RevokeSession:output_type -> user.RevokeSessionResponse
-	31, // 37: user.UserService.GetUserStats:output_type -> user.GetUserStatsResponse
-	23, // [23:38] is the sub-list for method output_type
-	8,  // [8:23] is the sub-list for method input_type
+	28, // 18: user.UserService.HardDeleteUser:input_type -> user.HardDeleteUserRequest
+	30, // 19: user.UserService.UpdateUserRole:input_type -> user.UpdateUserRoleRequest
+	6,  // 20: user.UserService.GetActiveSessions:input_type -> user.GetActiveSessionsRequest
+	8,  // 21: user.UserService.LogoutAllDevices:input_type -> user.LogoutAllDevicesRequest
+	10, // 22: user.UserService.RevokeSession:input_type -> user.RevokeSessionRequest
+	32, // 23: user.UserService.GetUserStats:input_type -> user.GetUserStatsRequest
+	34, // 24: user.UserService.IsTokenBlacklisted:input_type -> user.IsTokenBlacklistedRequest
+	2,  // 25: user.UserService.Register:output_type -> user.RegisterResponse
+	4,  // 26: user.UserService.Login:output_type -> user.LoginResponse
+	13, // 27: user.UserService.RefreshToken:output_type -> user.RefreshTokenResponse
+	15, // 28: user.UserService.Logout:output_type -> user.LogoutResponse
+	17, // 29: user.UserService.GetUserProfile:output_type -> user.GetUserProfileResponse
+	19, // 30: user.UserService.UpdateUserProfile:output_type -> user.UpdateUserProfileResponse
+	21, // 31: user.UserService.ChangePassword:output_type -> user.ChangePasswordResponse
+	23, // 32: user.UserService.ListUsers:output_type -> user.ListUsersResponse
+	25, // 33: user.UserService.SearchUsers:output_type -> user.SearchUsersResponse
+	27, // 34: user.UserService.DeleteUser:output_type -> user.DeleteUserResponse
+	29, // 35: user.UserService.HardDeleteUser:output_type -> user.HardDeleteUserResponse
+	31, // 36: user.UserService.UpdateUserRole:output_type -> user.UpdateUserRoleResponse
+	7,  // 37: user.UserService.GetActiveSessions:output_type -> user.GetActiveSessionsResponse
+	9,  // 38: user.UserService.LogoutAllDevices:output_type -> user.LogoutAllDevicesResponse
+	11, // 39: user.UserService.RevokeSession:output_type -> user.RevokeSessionResponse
+	33, // 40: user.UserService.GetUserStats:output_type -> user.GetUserStatsResponse
+	35, // 41: user.UserService.IsTokenBlacklisted:output_type -> user.IsTokenBlacklistedResponse
+	25, // [25:42] is the sub-list for method output_type
+	8,  // [8:25] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -2132,7 +2346,7 @@ func file_pkg_api_user_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_pkg_api_user_user_proto_rawDesc), len(file_pkg_api_user_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

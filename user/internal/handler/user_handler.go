@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -108,48 +109,51 @@ func domainToProto(user *domain.User) *pb.User {
 	}
 }
 
-// mapErrorToGRPCStatus maps service errors to gRPC status codes
+// mapErrorToGRPCStatus maps service errors to gRPC status codes using Sentinel Errors
 func mapErrorToGRPCStatus(err error) error {
 	if err == nil {
 		return nil
 	}
 
-	errMsg := err.Error()
-
-	// Check for validation errors
-	if contains(errMsg, "validation failed") ||
-		contains(errMsg, "is required") ||
-		contains(errMsg, "must be") {
-		return status.Error(codes.InvalidArgument, err.Error())
+	// Check for sentinel errors using errors.Is()
+	if errors.Is(err, domain.ErrNotFound) {
+		return status.Error(codes.NotFound, "resource not found")
 	}
 
-	// Check for already exists errors
-	if contains(errMsg, "already exists") {
+	if errors.Is(err, domain.ErrAlreadyExists) {
 		return status.Error(codes.AlreadyExists, err.Error())
 	}
 
-	// Check for authentication errors
-	if contains(errMsg, "invalid credentials") {
+	if errors.Is(err, domain.ErrInvalidInput) {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if errors.Is(err, domain.ErrUnauthorized) {
+		return status.Error(codes.PermissionDenied, "unauthorized action")
+	}
+
+	if errors.Is(err, domain.ErrInvalidCredentials) {
 		return status.Error(codes.Unauthenticated, "invalid credentials")
+	}
+
+	if errors.Is(err, domain.ErrTokenExpired) {
+		return status.Error(codes.Unauthenticated, "token expired")
+	}
+
+	if errors.Is(err, domain.ErrTokenRevoked) {
+		return status.Error(codes.Unauthenticated, "token revoked")
+	}
+
+	if errors.Is(err, domain.ErrTokenInvalid) {
+		return status.Error(codes.Unauthenticated, "token invalid")
+	}
+
+	if errors.Is(err, domain.ErrInsufficientPermissions) {
+		return status.Error(codes.PermissionDenied, "insufficient permissions")
 	}
 
 	// Default to internal error
 	return status.Error(codes.Internal, "internal server error")
-}
-
-// contains checks if string contains substring
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr || containsSubstring(s, substr)))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 // RefreshToken generates new access token from valid refresh token
@@ -159,8 +163,8 @@ func (h *UserHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequ
 		return nil, status.Error(codes.InvalidArgument, "refresh token is required")
 	}
 
-	// Call service layer
-	accessToken, accessExpiresAt, err := h.service.RefreshToken(ctx, req.RefreshToken)
+	// Call service layer with token rotation
+	accessToken, newRefreshToken, accessExpiresAt, refreshExpiresAt, err := h.service.RefreshToken(ctx, req.RefreshToken)
 	if err != nil {
 		if strings.Contains(err.Error(), "revoked") || strings.Contains(err.Error(), "expired") || strings.Contains(err.Error(), "invalid") {
 			return nil, status.Error(codes.Unauthenticated, err.Error())
@@ -168,30 +172,36 @@ func (h *UserHandler) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequ
 		return nil, status.Errorf(codes.Internal, "failed to refresh token: %v", err)
 	}
 
-	// Return new tokens (same refresh token in this implementation)
+	// Return new tokens with rotation
 	return &pb.RefreshTokenResponse{
-		AccessToken:          accessToken,
-		RefreshToken:         req.RefreshToken, // Not rotating in this version
-		AccessTokenExpiresAt: accessExpiresAt,
+		AccessToken:           accessToken,
+		RefreshToken:          newRefreshToken, // NEW: Rotated refresh token
+		AccessTokenExpiresAt:  accessExpiresAt,
+		RefreshTokenExpiresAt: refreshExpiresAt, // NEW: New expiration time
 	}, nil
 }
 
-// Logout revokes a refresh token
+// Logout revokes a refresh token and optionally blacklists access token
 func (h *UserHandler) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
 	// Validate input
 	if req.RefreshToken == "" {
 		return nil, status.Error(codes.InvalidArgument, "refresh token is required")
 	}
 
-	// Call service layer
-	err := h.service.Logout(ctx, req.RefreshToken)
+	// Call service layer with both refresh and access tokens
+	err := h.service.Logout(ctx, req.RefreshToken, req.AccessToken)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to logout: %v", err)
 	}
 
+	message := "Successfully logged out"
+	if req.AccessToken != "" {
+		message = "Successfully logged out. Access token has been immediately revoked."
+	}
+
 	return &pb.LogoutResponse{
 		Success: true,
-		Message: "Successfully logged out",
+		Message: message,
 	}, nil
 }
 
@@ -277,6 +287,14 @@ func (h *UserHandler) ChangePassword(ctx context.Context, req *pb.ChangePassword
 // ListUsers return a paginated list of users with optional role filtering, admin only
 func (h *UserHandler) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
 	// TODO: Add admin role check from JWT in context metadata
+
+	// Validate pagination parameters
+	if req.Page < 1 {
+		return nil, status.Error(codes.InvalidArgument, "page must be greater than 0")
+	}
+	if req.PageSize < 1 || req.PageSize > 100 {
+		return nil, status.Error(codes.InvalidArgument, "page_size must be between 1 and 100")
+	}
 
 	users, totalCount, totalPages, err := h.service.ListUsers(
 		ctx,
@@ -481,5 +499,21 @@ func (h *UserHandler) GetUserStats(ctx context.Context, req *pb.GetUserStatsRequ
 		UsersByRoleClient:   int32(stats["role_Client"]),
 		UsersByRoleMerchant: int32(stats["role_Merchant"]),
 		UsersByRoleAdmin:    int32(stats["role_Admin"]),
+	}, nil
+}
+
+// IsTokenBlacklisted checks if a token JTI is in the blacklist
+func (h *UserHandler) IsTokenBlacklisted(ctx context.Context, req *pb.IsTokenBlacklistedRequest) (*pb.IsTokenBlacklistedResponse, error) {
+	if req.Jti == "" {
+		return nil, status.Error(codes.InvalidArgument, "jti is required")
+	}
+
+	isBlacklisted, err := h.service.IsTokenBlacklisted(ctx, req.Jti)
+	if err != nil {
+		return nil, status.Error(codes.Internal, fmt.Sprintf("failed to check token blacklist: %v", err))
+	}
+
+	return &pb.IsTokenBlacklistedResponse{
+		IsBlacklisted: isBlacklisted,
 	}, nil
 }

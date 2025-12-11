@@ -18,6 +18,7 @@ service UserService {
     rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
     rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
     rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+    rpc HardDeleteUser(HardDeleteUserRequest) returns (HardDeleteUserResponse); // For rollback only
     rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse);
 
     // Session management
@@ -27,6 +28,9 @@ service UserService {
 
     // Account statistics
     rpc GetUserStats(GetUserStatsRequest) returns (GetUserStatsResponse);
+    
+    // Token blacklist operations (for Gateway middleware)
+    rpc IsTokenBlacklisted(IsTokenBlacklistedRequest) returns (IsTokenBlacklistedResponse);
 }
 
 // User represents a user in the system
@@ -122,9 +126,10 @@ message RefreshTokenResponse {
     int64 refresh_token_expires_at = 4; // Unix timestamp
 }
 
-// LogoutRequest - Client sends refresh token to logout
+// LogoutRequest - Client sends refresh token and optionally access token to logout
 message LogoutRequest {
-    string refresh_token = 1;
+    string refresh_token = 1; // Required: refresh token to revoke
+    string access_token = 2;   // Optional: access token to blacklist for immediate revocation
 }
 
 // LogoutResponse - Server confirms logout
@@ -204,6 +209,16 @@ message DeleteUserResponse {
     string message = 2;
 }
 
+// HardDeleteUser - Permanently delete a user (for rollback scenarios ONLY)
+message HardDeleteUserRequest {
+    string user_id = 1;
+}
+
+message HardDeleteUserResponse {
+    bool success = 1;
+    string message = 2;
+}
+
 // UdateUserRole - Change platform role of a user (for admin use)
 message UpdateUserRoleRequest {
     string user_id = 1;
@@ -224,4 +239,13 @@ message GetUserStatsResponse {
     int32 users_by_role_client = 4;
     int32 users_by_role_merchant = 5;
     int32 users_by_role_admin = 6;
+}
+
+// IsTokenBlacklisted - Check if a token JTI is blacklisted
+message IsTokenBlacklistedRequest {
+    string jti = 1; // JWT ID to check
+}
+
+message IsTokenBlacklistedResponse {
+    bool is_blacklisted = 1;
 }

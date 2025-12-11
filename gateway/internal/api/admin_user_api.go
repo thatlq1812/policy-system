@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/thatlq1812/policy-system/gateway/internal/middleware"
 	pb "github.com/thatlq1812/policy-system/shared/pkg/api/user"
 )
 
@@ -68,9 +69,10 @@ func (api *UserAPI) CreateAdminUser(c *gin.Context) {
 	grpcResp, err := api.userClient.Register(ctx, grpcReq)
 	if err != nil {
 		log.Printf("[ADMIN] Failed to create admin: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "500",
-			"message": "Failed to create admin user",
+		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
 		})
 		return
 	}

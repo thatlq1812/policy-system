@@ -1,12 +1,16 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+
+	pb "github.com/thatlq1812/policy-system/shared/pkg/api/user"
 )
 
 // Claims định nghĩa cấu trúc data trong JWT token
@@ -17,8 +21,14 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// AuthMiddleware tạo middleware để validate JWT token (Gin version)
+// AuthMiddleware tạo middleware để validate JWT token với blacklist check
+// userClient is optional - if nil, blacklist check is skipped (backwards compatible)
 func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
+	return AuthMiddlewareWithBlacklist(jwtSecret, nil)
+}
+
+// AuthMiddlewareWithBlacklist validates JWT token and checks blacklist
+func AuthMiddlewareWithBlacklist(jwtSecret string, userClient pb.UserServiceClient) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Bước 1: Lấy Authorization header
 		authHeader := c.GetHeader("Authorization")
@@ -91,7 +101,32 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		// Bước 5: Lưu claims vào Gin context
+		// Bước 5: Check token blacklist (if userClient is provided)
+		if userClient != nil {
+			if jti, ok := token.Claims.(jwt.MapClaims)["jti"].(string); ok && jti != "" {
+				ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+				defer cancel()
+
+				resp, err := userClient.IsTokenBlacklisted(ctx, &pb.IsTokenBlacklistedRequest{
+					Jti: jti,
+				})
+
+				if err != nil {
+					// Log error but don't fail the request
+					// This ensures service degradation doesn't block all requests
+					fmt.Printf("WARNING: Failed to check token blacklist: %v\n", err)
+				} else if resp != nil && resp.IsBlacklisted {
+					c.JSON(http.StatusUnauthorized, gin.H{
+						"code":    "401",
+						"message": "Token has been revoked",
+					})
+					c.Abort()
+					return
+				}
+			}
+		}
+
+		// Bước 6: Lưu claims vào Gin context
 		c.Set("user_id", claims.UserID)
 		c.Set("phone_number", claims.PhoneNumber)
 		c.Set("platform_role", claims.PlatformRole)

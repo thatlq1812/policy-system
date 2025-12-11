@@ -69,6 +69,7 @@ func (api *UserAPI) Register(c *gin.Context) {
 
 	grpcResp, err := api.userClient.Register(c.Request.Context(), grpcReq)
 	if err != nil {
+		log.Printf("[Register] gRPC Error: %v | Request: phone=%s, role=%s", err, reqBody.PhoneNumber, reqBody.PlatformRole)
 		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
 		c.JSON(statusCode, gin.H{
 			"code":    code,
@@ -118,6 +119,7 @@ func (api *UserAPI) Login(c *gin.Context) {
 
 	grpcResp, err := api.userClient.Login(c.Request.Context(), grpcReq)
 	if err != nil {
+		log.Printf("[Login] gRPC Error: %v | Request: phone=%s", err, reqBody.PhoneNumber)
 		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
 		c.JSON(statusCode, gin.H{
 			"code":    code,
@@ -537,7 +539,11 @@ func (api *UserAPI) RefreshToken(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("[REFRESH] Failed to refresh token: %v", err)
-		errorResponse(c, http.StatusUnauthorized, "Invalid or expired refresh token")
+		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 
@@ -551,20 +557,21 @@ func (api *UserAPI) RefreshToken(c *gin.Context) {
 
 // Logout godoc
 // @Summary      Logout user
-// @Description  Revoke a specific refresh token to log out from a session
+// @Description  Revoke a specific refresh token and blacklist access token for immediate logout
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
-// @Param        request body object{refresh_token=string} true "Refresh token to revoke"
+// @Param        request body object{refresh_token=string,access_token=string} true "Tokens to revoke. access_token is optional but recommended for immediate revocation"
 // @Success      200  {object}  object{code=string,message=string}
 // @Failure      400  {object}  object{code=string,message=string}
 // @Failure      401  {object}  object{code=string,message=string}
 // @Router       /auth/logout [post]
-// Giải thích: Thu hồi refresh token khi user logout
-// Flow: Gateway forward request sang User Service → User Service invalidate refresh token
+// Giải thích: Thu hồi refresh token và blacklist access token khi user logout
+// Flow: Gateway forward request sang User Service → User Service invalidate refresh token + blacklist access token
 func (api *UserAPI) Logout(c *gin.Context) {
 	var reqBody struct {
 		RefreshToken string `json:"refresh_token" binding:"required"`
+		AccessToken  string `json:"access_token"` // Optional but recommended
 	}
 
 	if err := c.ShouldBindJSON(&reqBody); err != nil {
@@ -572,14 +579,19 @@ func (api *UserAPI) Logout(c *gin.Context) {
 		return
 	}
 
-	// Forward to User Service
+	// Forward to User Service with both tokens
 	resp, err := api.userClient.Logout(c.Request.Context(), &pb.LogoutRequest{
 		RefreshToken: reqBody.RefreshToken,
+		AccessToken:  reqBody.AccessToken,
 	})
 
 	if err != nil {
 		log.Printf("[LOGOUT] Failed to logout: %v", err)
-		errorResponse(c, http.StatusInternalServerError, "Failed to logout")
+		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 
@@ -630,7 +642,11 @@ func (api *UserAPI) ChangePassword(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("[CHANGE_PASSWORD] Failed for user %s: %v", userID, err)
-		errorResponse(c, http.StatusBadRequest, "Failed to change password. Please check your old password.")
+		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 
@@ -687,7 +703,11 @@ func (api *UserAPI) ListUsers(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("[ADMIN] Failed to list users: %v", err)
-		errorResponse(c, http.StatusInternalServerError, "Failed to retrieve users")
+		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 
@@ -717,7 +737,11 @@ func (api *UserAPI) GetUserStats(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("[ADMIN] Failed to get user stats: %v", err)
-		errorResponse(c, http.StatusInternalServerError, "Failed to retrieve statistics")
+		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 

@@ -23,6 +23,7 @@ type UserRepository interface {
 	ListUsers(ctx context.Context, params domain.ListUsersParams) ([]*domain.User, int, error)
 	SearchUsers(ctx context.Context, query string, limit int) ([]*domain.User, error)
 	SoftDelete(ctx context.Context, userID, reason string) error
+	HardDelete(ctx context.Context, userID string) error // NEW: For rollback scenarios
 	UpdateRole(ctx context.Context, userID, platformRole string) (*domain.User, error)
 
 	GetUserStats(ctx context.Context) (map[string]int, error)
@@ -311,6 +312,24 @@ func (r *postgresUserRepository) SoftDelete(ctx context.Context, userID, reason 
 
 	if result.RowsAffected() == 0 {
 		return fmt.Errorf("user not found or already deleted")
+	}
+
+	return nil
+}
+
+// HardDelete permanently removes user from database
+// WARNING: This should only be used for rollback scenarios, not normal deletion
+// Normal deletions should use SoftDelete to preserve audit trail
+func (r *postgresUserRepository) HardDelete(ctx context.Context, userID string) error {
+	query := `DELETE FROM users WHERE id = $1`
+
+	result, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to hard delete user: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("user not found")
 	}
 
 	return nil

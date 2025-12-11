@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/thatlq1812/policy-system/gateway/internal/clients"
+	"github.com/thatlq1812/policy-system/gateway/internal/middleware"
 
 	consentpb "github.com/thatlq1812/policy-system/shared/pkg/api/consent"
 )
@@ -49,7 +50,11 @@ func (api *AdminAPI) GetConsentStats(c *gin.Context) {
 
 	if err != nil {
 		log.Printf("[ADMIN] Failed to get consent stats: %v", err)
-		errorResponse(c, http.StatusInternalServerError, "Failed to retrieve consent statistics")
+		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 

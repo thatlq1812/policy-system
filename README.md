@@ -22,10 +22,10 @@ Enterprise-grade microservices system handling privacy policy management and use
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Gateway Service                          │
-│                (HTTP/REST → gRPC Orchestration)              │
-│       Endpoints: Auth, Users, Policies, Consents, Admin      │
-│                       Port: 8080                             │
+│                     Gateway Service                         │
+│                (HTTP/REST → gRPC Orchestration)             │
+│       Endpoints: Auth, Users, Policies, Consents, Admin     │
+│                       Port: 8080                            │
 └──────────────┬──────────────┬──────────────┬────────────────┘
                │              │              │
        ┌───────▼──────┐ ┌─────▼──────┐ ┌────▼───────┐
