@@ -14,6 +14,7 @@ type RefreshToken struct {
 	RevokedReason *string    `db:"revoked_reason"`
 	DeviceInfo    *string    `db:"device_info"`
 	IPAddress     *string    `db:"ip_address"`
+	LastUsedAt    *time.Time `db:"last_used_at"` // For token reuse detection
 }
 
 // CreateRefreshTokenParams contains parameters for creating a refresh token

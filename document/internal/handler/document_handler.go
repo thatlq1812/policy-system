@@ -2,7 +2,7 @@ package handler
 
 import (
 	"context"
-	"strings"
+	"errors"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -109,10 +109,7 @@ func domainToPb(doc *domain.PolicyDocument) *pb.PolicyDocument {
 func (h *DocumentHandler) GetPolicyHistory(ctx context.Context, req *pb.GetPolicyHistoryRequest) (*pb.GetPolicyHistoryResponse, error) {
 	documents, err := h.service.GetPolicyHistory(ctx, req.Platform, req.DocumentName)
 	if err != nil {
-		if strings.Contains(err.Error(), "validation") || strings.Contains(err.Error(), "required") {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid input: %v", err)
-		}
-		return nil, status.Errorf(codes.Internal, "failed to get history: %v", err)
+		return nil, mapErrorToGRPCStatus(err)
 	}
 
 	// Convert domain models to proto messages
@@ -143,36 +140,20 @@ func mapErrorToGRPCStatus(err error) error {
 		return nil
 	}
 
-	// Check for validation errors
-	errMsg := err.Error()
-	if contains(errMsg, "validation failed") ||
-		contains(errMsg, "is required") ||
-		contains(errMsg, "must be") {
+	// Use errors.Is() to check sentinel errors
+	switch {
+	case errors.Is(err, domain.ErrInvalidInput):
 		return status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	// Check for not found errors
-	if contains(errMsg, "not found") {
+	case errors.Is(err, domain.ErrNotFound):
 		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, domain.ErrAlreadyExists):
+		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, domain.ErrVersionConflict):
+		return status.Error(codes.Aborted, err.Error())
+	case errors.Is(err, domain.ErrNoActiveVersion):
+		return status.Error(codes.NotFound, err.Error())
+	default:
+		// Default to internal error for unknown errors
+		return status.Error(codes.Internal, "internal server error")
 	}
-
-	// Default to internal error
-	return status.Error(codes.Internal, "internal server error")
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) &&
-		(s == substr || len(s) > len(substr) &&
-			(s[:len(substr)] == substr ||
-				s[len(s)-len(substr):] == substr ||
-				containsSubstring(s, substr)))
-}
-
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

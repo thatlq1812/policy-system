@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -248,25 +249,22 @@ func mapError(err error) error {
 		return nil
 	}
 
-	errMsg := err.Error()
-
-	// Validation errors
-	if contains(errMsg, "invalid") || contains(errMsg, "required") || contains(errMsg, "cannot be empty") {
-		return status.Error(codes.InvalidArgument, errMsg)
+	// Use errors.Is() to check sentinel errors
+	switch {
+	case errors.Is(err, domain.ErrInvalidInput):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrNotFound):
+		return status.Error(codes.NotFound, err.Error())
+	case errors.Is(err, domain.ErrAlreadyExists):
+		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, domain.ErrInvalidConsent):
+		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, domain.ErrDocumentNotFound):
+		return status.Error(codes.NotFound, err.Error())
+	default:
+		// Default to internal error for unknown errors
+		return status.Error(codes.Internal, "internal server error")
 	}
-
-	// Not found errors
-	if contains(errMsg, "not found") || contains(errMsg, "already deleted") {
-		return status.Error(codes.NotFound, errMsg)
-	}
-
-	// Duplicate errors (unique constraint violation)
-	if contains(errMsg, "duplicate") || contains(errMsg, "already exists") {
-		return status.Error(codes.AlreadyExists, errMsg)
-	}
-
-	// Default: Internal error
-	return status.Error(codes.Internal, "internal server error")
 }
 
 // GetConsentHistory - Get all consent versions for user+document
@@ -324,19 +322,4 @@ func (h *ConsentHandler) GetConsentStats(ctx context.Context, req *pb.GetConsent
 	}
 
 	return response, nil
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) &&
-		(s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			findSubstring(s, substr)))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

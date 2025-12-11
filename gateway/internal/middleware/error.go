@@ -24,9 +24,11 @@ func GrpcErrorToHTTP(err error) (int, string, string) {
 	case codes.NotFound:
 		return http.StatusNotFound, response.CodeNotFound, st.Message()
 	case codes.AlreadyExists:
-		return http.StatusConflict, "409", st.Message()
+		return http.StatusConflict, response.CodeConflict, st.Message()
 	case codes.PermissionDenied:
 		return http.StatusForbidden, "403", st.Message()
+	case codes.Aborted:
+		return http.StatusConflict, response.CodeConflict, st.Message()
 	default:
 		return http.StatusInternalServerError, response.CodeInternalError, st.Message()
 	}

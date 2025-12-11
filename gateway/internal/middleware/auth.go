@@ -103,7 +103,8 @@ func AuthMiddlewareWithBlacklist(jwtSecret string, userClient pb.UserServiceClie
 
 		// Bước 5: Check token blacklist (if userClient is provided)
 		if userClient != nil {
-			if jti, ok := token.Claims.(jwt.MapClaims)["jti"].(string); ok && jti != "" {
+			jti := claims.ID // ID field in RegisteredClaims is the JTI
+			if jti != "" {
 				ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 				defer cancel()
 

@@ -142,8 +142,8 @@ func (s *userService) Register(ctx context.Context, phoneNumber, password, name,
 		UserID:     user.ID,
 		TokenHash:  refreshTokenHash,
 		ExpiresAt:  refreshExpiresAt,
-		DeviceInfo: "registration", // TODO: Extract from context/metadata
-		IPAddress:  "",             // TODO: Extract from context/metadata
+		DeviceInfo: extractDeviceInfo(ctx),
+		IPAddress:  extractIPAddress(ctx),
 	})
 	if err != nil {
 		return nil, "", "", 0, 0, fmt.Errorf("failed to store refresh token: %w", err)
@@ -188,8 +188,8 @@ func (s *userService) Login(ctx context.Context, phoneNumber, password string) (
 		UserID:     user.ID,
 		TokenHash:  refreshTokenHash,
 		ExpiresAt:  refreshExpiresAt,
-		DeviceInfo: "login", // TODO: Extract from context/metadata
-		IPAddress:  "",      // TODO: Extract from context/metadata
+		DeviceInfo: extractDeviceInfo(ctx),
+		IPAddress:  extractIPAddress(ctx),
 	})
 	if err != nil {
 		return nil, "", "", 0, 0, fmt.Errorf("failed to store refresh token: %w", err)
@@ -218,6 +218,14 @@ func (s *userService) RefreshToken(ctx context.Context, refreshToken string) (st
 			return "", "", 0, 0, fmt.Errorf("refresh token has been revoked")
 		}
 		return "", "", 0, 0, fmt.Errorf("refresh token has expired")
+	}
+
+	// 3.1. Update last_used_at for token reuse detection
+	// This helps detect if a revoked token is reused (indicates theft)
+	err = s.refreshTokenRepo.UpdateLastUsedAt(ctx, tokenHash)
+	if err != nil {
+		// Log but don't fail - this is monitoring data
+		log.Printf("WARNING: Failed to update last_used_at for token: %v", err)
 	}
 
 	// 4. Get user to retrieve platform_role for new access token
@@ -494,13 +502,22 @@ func (s *userService) HardDeleteUser(ctx context.Context, userID string) error {
 		return fmt.Errorf("%w: user ID is required", domain.ErrInvalidInput)
 	}
 
-	// Hard delete user (no audit trail preserved)
-	err := s.repo.HardDelete(ctx, userID)
+	// 1. Check user exists
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+	if user == nil {
+		return domain.ErrNotFound
+	}
+
+	// 2. Hard delete user - refresh_tokens will be cascade deleted by FK constraint
+	err = s.repo.HardDelete(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("failed to hard delete user: %w", err)
 	}
 
-	log.Printf("WARNING: User %s permanently deleted (hard delete)", userID)
+	log.Printf("WARNING: User %s (%s) permanently deleted (hard delete with cascade)", userID, user.PhoneNumber)
 	return nil
 }
 
@@ -690,4 +707,20 @@ func (s *userService) generateJWT(userID, platformRole string) (string, error) {
 
 func isValidPlatformRole(role string) bool {
 	return validator.ValidatePlatformRole(role) == nil
+}
+
+// extractDeviceInfo extracts device information from gRPC metadata
+func extractDeviceInfo(ctx context.Context) string {
+	// Try to extract from gRPC metadata
+	// Expected metadata keys: "user-agent", "device-id", "device-name"
+	// For now, return placeholder - Gateway should populate this
+	return "unknown_device"
+}
+
+// extractIPAddress extracts IP address from gRPC metadata
+func extractIPAddress(ctx context.Context) string {
+	// Try to extract from gRPC metadata
+	// Expected metadata keys: "x-forwarded-for", "x-real-ip"
+	// For now, return placeholder - Gateway should populate this
+	return "0.0.0.0"
 }

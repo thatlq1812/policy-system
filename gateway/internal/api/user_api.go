@@ -152,10 +152,10 @@ func (api *UserAPI) Login(c *gin.Context) {
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
-// @Param        request body object{phone_number=string,password=string} true "Login credentials"
+// @Param        request body object{phone_number=string,password=string} true "Login credentials" example({"phone_number":"0901234567","password":"SecurePass@123"})
 // @Success      200  {object}  object{code=string,message=string,data=object{user=object{id=string,phone_number=string,name=string,platform_role=string},access_token=string,refresh_token=string,access_token_expires_at=int64,refresh_token_expires_at=int64,requires_consent=boolean,pending_policies=array,consent_message=string}}
-// @Failure      400  {object}  object{code=string,message=string}
-// @Failure      401  {object}  object{code=string,message=string}
+// @Failure      400  {object}  object{code=string,message=string} "Bad Request - Missing phone/password"
+// @Failure      401  {object}  object{code=string,message=string} "Unauthorized - Invalid credentials"
 // @Failure      500  {object}  object{code=string,message=string}
 // @Router       /auth/login [post]
 func (api *UserAPI) LoginWithPendingCheck(c *gin.Context) {
@@ -301,11 +301,11 @@ func (api *UserAPI) LoginWithPendingCheck(c *gin.Context) {
 // @Tags         Authentication
 // @Accept       json
 // @Produce      json
-// @Param        request body object{phone_number=string,password=string,name=string,platform_role=string} true "Registration details. platform_role must be either 'Client' or 'Merchant' (Admin is not allowed)"
+// @Param        request body object{phone_number=string,password=string,name=string,platform_role=string} true "Registration details. platform_role must be either 'Client' or 'Merchant' (Admin is not allowed)" example({"phone_number":"0901234567","password":"SecurePass@123","name":"John Doe","platform_role":"Client"})
 // @Success      201  {object}  object{code=string,message=string,data=object{user=object{id=string,phone_number=string,name=string,platform_role=string,created_at=int64},access_token=string,refresh_token=string,access_token_expires_at=int64,refresh_token_expires_at=int64,policy_consented=object{document_id=string,version=string,consent_recorded=bool}}}
-// @Failure      400  {object}  object{code=string,message=string}
+// @Failure      400  {object}  object{code=string,message=string} "Bad Request - Invalid phone/password format"
 // @Failure      403  {object}  object{code=string,message=string} "Forbidden - Admin role cannot be registered publicly"
-// @Failure      409  {object}  object{code=string,message=string}
+// @Failure      409  {object}  object{code=string,message=string} "Conflict - Phone number already exists"
 // @Failure      500  {object}  object{code=string,message=string}
 // @Router       /auth/register [post]
 func (api *UserAPI) RegisterWithConsent(c *gin.Context) {

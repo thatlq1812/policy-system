@@ -23,9 +23,14 @@ type DocumentClient struct {
 // addr: địa chỉ service (vd: "localhost:50051")
 // timeout: thời gian timeout cho mỗi gRPC call
 func NewDocumentClient(addr string, timeout time.Duration) (*DocumentClient, error) {
-	// Tạo gRPC connection với NewClient (non-deprecated)
-	conn, err := grpc.NewClient(addr,
+	// Context với timeout để tránh wait vô hạn khi connect
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Tạo gRPC connection với DialContext + WithBlock
+	conn, err := grpc.DialContext(ctx, addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(), // Wait until connection is ready
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to document service at %s: %w", addr, err)

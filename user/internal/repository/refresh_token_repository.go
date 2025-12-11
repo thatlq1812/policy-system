@@ -19,6 +19,9 @@ type RefreshTokenRepository interface {
 	// Revoke marks a refresh token as revoked
 	Revoke(ctx context.Context, tokenHash, reason string) error
 
+	// UpdateLastUsedAt updates the last_used_at timestamp for token reuse detection
+	UpdateLastUsedAt(ctx context.Context, tokenHash string) error
+
 	// RevokeAllUserTokens revokes all refresh tokens for a user (logout all devices)
 	RevokeAllUserTokens(ctx context.Context, userID, reason string) (int64, error)
 
@@ -82,7 +85,7 @@ func (r *postgresRefreshTokenRepository) Create(ctx context.Context, params doma
 // GetByTokenHash retrieves a refresh token by its hash
 func (r *postgresRefreshTokenRepository) GetByTokenHash(ctx context.Context, tokenHash string) (*domain.RefreshToken, error) {
 	query := `
-		SELECT id, user_id, token_hash, expires_at, created_at, revoked_at, revoked_reason, device_info, ip_address
+		SELECT id, user_id, token_hash, expires_at, created_at, revoked_at, revoked_reason, device_info, ip_address, last_used_at
 		FROM refresh_tokens
 		WHERE token_hash = $1
 	`
@@ -98,6 +101,7 @@ func (r *postgresRefreshTokenRepository) GetByTokenHash(ctx context.Context, tok
 		&token.RevokedReason,
 		&token.DeviceInfo,
 		&token.IPAddress,
+		&token.LastUsedAt,
 	)
 
 	if err != nil {
@@ -126,6 +130,22 @@ func (r *postgresRefreshTokenRepository) Revoke(ctx context.Context, tokenHash, 
 	if rowsAffected == 0 {
 		return fmt.Errorf("refresh token not found or already revoked")
 	}
+
+	return nil
+}
+
+// UpdateLastUsedAt updates the last_used_at timestamp for token reuse detection
+func (r *postgresRefreshTokenRepository) UpdateLastUsedAt(ctx context.Context, tokenHash string) error {
+	query := `
+		UPDATE refresh_tokens
+		SET last_used_at = CURRENT_TIMESTAMP
+		WHERE token_hash = $1
+	`
+	_, err := r.db.Exec(ctx, query, tokenHash)
+	if err != nil {
+		return fmt.Errorf("failed to update last_used_at: %w", err)
+	}
+
 	return nil
 }
 

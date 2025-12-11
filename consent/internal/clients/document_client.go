@@ -3,6 +3,7 @@ package clients
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -16,7 +17,13 @@ type DocumentClient struct {
 }
 
 func NewDocumentClient(address string) (*DocumentClient, error) {
-	conn, err := grpc.NewClient(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, address,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(), // Wait until connection is ready
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to document service: %w", err)
 	}

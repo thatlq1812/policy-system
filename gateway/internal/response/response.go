@@ -3,6 +3,10 @@ package response
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Response struct {
@@ -35,6 +39,7 @@ const (
 	CodeBadRequest    = "400"
 	CodeUnauthorized  = "401"
 	CodeNotFound      = "404"
+	CodeConflict      = "409"
 	CodeInternalError = "500"
 )
 
@@ -72,4 +77,50 @@ func JSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(data)
+}
+
+// ErrorFromGRPC maps gRPC error to HTTP response
+func ErrorFromGRPC(w http.ResponseWriter, err error) {
+	st, ok := status.FromError(err)
+	if !ok {
+		Error(w, http.StatusInternalServerError, CodeInternalError, "internal server error")
+		return
+	}
+
+	statusCode, code := mapGRPCCodeToHTTP(st.Code())
+	message := st.Message()
+
+	// Make error messages more user-friendly
+	if strings.Contains(message, "already exists") {
+		statusCode = http.StatusConflict
+		code = CodeConflict
+	}
+
+	Error(w, statusCode, code, message)
+}
+
+// mapGRPCCodeToHTTP converts gRPC status code to HTTP status code
+func mapGRPCCodeToHTTP(grpcCode codes.Code) (int, string) {
+	switch grpcCode {
+	case codes.OK:
+		return http.StatusOK, CodeSuccess
+	case codes.InvalidArgument:
+		return http.StatusBadRequest, CodeBadRequest
+	case codes.Unauthenticated:
+		return http.StatusUnauthorized, CodeUnauthorized
+	case codes.PermissionDenied:
+		return http.StatusForbidden, "403"
+	case codes.NotFound:
+		return http.StatusNotFound, CodeNotFound
+	case codes.AlreadyExists:
+		return http.StatusConflict, CodeConflict
+	case codes.Aborted:
+		return http.StatusConflict, CodeConflict
+	case codes.Internal:
+		return http.StatusInternalServerError, CodeInternalError
+	case codes.Unavailable:
+		return http.StatusServiceUnavailable, "503"
+	default:
+		return http.StatusInternalServerError, CodeInternalError
+	}
 }

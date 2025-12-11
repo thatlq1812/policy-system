@@ -128,6 +128,7 @@ func (api *ConsentAPI) RecordConsent(c *gin.Context) {
 // @Tags         Consent Management
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        request body object{user_id=string,document_id=string,min_version_timestamp=int64} true "Consent check request"
 // @Success      200  {object}  object{code=string,message=string,data=object{has_consented=bool,latest_consent=object}}
 // @Failure      400  {object}  object{code=string,message=string}
@@ -254,6 +255,7 @@ func (api *ConsentAPI) GetUserConsents(c *gin.Context) {
 // @Tags         Consent Management
 // @Accept       json
 // @Produce      json
+// @Security     BearerAuth
 // @Param        request body object{user_id=string,platform=string,latest_policies=[]object} true "Pending consent check request"
 // @Success      200  {object}  object{code=string,message=string,data=object{has_pending=bool,pending_documents=[]object,total_pending=int32}}
 // @Failure      400  {object}  object{code=string,message=string}
