@@ -247,8 +247,8 @@ func (s *consentService) GetConsentStats(ctx context.Context, platform string) (
 
 // Validation helpers
 func validatePlatform(platform string) error {
-	if platform != domain.PlatformClient && platform != domain.PlatformMerchant {
-		return fmt.Errorf("invalid platform: must be '%s' or '%s'", domain.PlatformClient, domain.PlatformMerchant)
+	if platform != domain.PlatformClient && platform != domain.PlatformMerchant && platform != domain.PlatformAdmin {
+		return fmt.Errorf("invalid platform: must be one of: '%s', '%s', or '%s'", domain.PlatformClient, domain.PlatformMerchant, domain.PlatformAdmin)
 	}
 	return nil
 }

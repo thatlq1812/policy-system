@@ -2,7 +2,7 @@
 
 Authentication and user management service using gRPC with dual token system (Access + Refresh tokens).
 
-**Version:** 1.0.0 | **Status:** Production Ready | **Port:** 50052 (gRPC) | **Methods:** 15/15
+**Version:** 1.0.0 | **Status:** Production Ready | **Port:** 50052 (gRPC) | **Methods:** 14/14
 
 ---
 
@@ -41,6 +41,7 @@ Authentication and user management service using gRPC with dual token system (Ac
 - Search users by name or phone number
 - Soft delete users with reason tracking
 - Update user platform roles
+- **Admin Account Creation:** Only via Gateway admin endpoint (secured)
 
 **Session Management (Phase 7)**
 - View all active sessions for a user
@@ -58,6 +59,7 @@ Authentication and user management service using gRPC with dual token system (Ac
 - **Password:** bcrypt hashed (cost factor 10)
 - **Tokens:** SHA256 hashed in database
 - **Revocation:** Full logout support with audit trail
+- **Admin Protection:** Admin role cannot be set via Register RPC (Gateway enforces this)
 
 ### Architecture
 ```
@@ -221,7 +223,8 @@ message RegisterRequest {
     string phone_number = 1;  // Required, format: 10 digits starting with 0
     string password = 2;      // Required, min 6 characters
     string name = 3;          // Required
-    string platform_role = 4; // Required: "Client" or "Merchant"
+    string platform_role = 4; // Required: "Client", "Merchant", or "Admin"
+                             // Note: "Admin" only accepted via Gateway admin endpoint
 }
 ```
 

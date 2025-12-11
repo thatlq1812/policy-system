@@ -55,9 +55,7 @@ func (s *documentService) GetLatestPolicy(ctx context.Context, platform, documen
 	if platform == "" {
 		return nil, fmt.Errorf("platform is required")
 	}
-	if documentName == "" {
-		return nil, fmt.Errorf("document_name is required")
-	}
+	// document_name is optional - if empty, will get any latest policy for platform
 
 	// Call repository
 	doc, err := s.repo.GetLatest(ctx, platform, documentName)
@@ -74,8 +72,8 @@ func (s *documentService) UpdatePolicy(ctx context.Context, params domain.Create
 	if params.DocumentName == "" {
 		return nil, fmt.Errorf("validation failed: document_name is required")
 	}
-	if params.Platform != "Client" && params.Platform != "Merchant" {
-		return nil, fmt.Errorf("validation failed: platform must be either 'Client' or 'Merchant'")
+	if params.Platform != "Client" && params.Platform != "Merchant" && params.Platform != "Admin" {
+		return nil, fmt.Errorf("validation failed: platform must be one of: 'Client', 'Merchant', or 'Admin'")
 	}
 	if params.ContentHTML == "" && params.FileURL == "" {
 		return nil, fmt.Errorf("validation failed: either content_html or file_url must be provided")
@@ -122,8 +120,8 @@ func (s *documentService) GetPolicyHistory(ctx context.Context, platform, docume
 	}
 
 	// Validate platform enum
-	if platform != "Client" && platform != "Merchant" {
-		return nil, fmt.Errorf("platform must be either 'Client' or 'Merchant'")
+	if platform != "Client" && platform != "Merchant" && platform != "Admin" {
+		return nil, fmt.Errorf("platform must be one of: 'Client', 'Merchant', or 'Admin'")
 	}
 
 	// Call repository

@@ -66,18 +66,34 @@ func (r *postgresDocumentRepository) Create(ctx context.Context, params domain.C
 
 func (r *postgresDocumentRepository) GetLatest(ctx context.Context, platform, documentName string) (*domain.PolicyDocument, error) {
 	// 1. Write SELECT query with ORDER BY effective_timestamp DESC LIMIT 1
-	// 2. Add WHERE clause for platform and document_name
-	query := `
-		SELECT id, document_name, platform, is_mandatory, effective_timestamp, content_html, file_url, created_at, created_by
-		FROM policy_documents
-		WHERE platform = $1 AND document_name = $2
-		ORDER BY effective_timestamp DESC
-		LIMIT 1
-	`
+	// 2. Add WHERE clause for platform and optionally document_name
+	var query string
+	var args []interface{}
+
+	if documentName != "" {
+		query = `
+			SELECT id, document_name, platform, is_mandatory, effective_timestamp, content_html, file_url, created_at, created_by
+			FROM policy_documents
+			WHERE platform = $1 AND document_name = $2
+			ORDER BY effective_timestamp DESC
+			LIMIT 1
+		`
+		args = []interface{}{platform, documentName}
+	} else {
+		// Get any latest policy for platform (for registration auto-consent)
+		query = `
+			SELECT id, document_name, platform, is_mandatory, effective_timestamp, content_html, file_url, created_at, created_by
+			FROM policy_documents
+			WHERE platform = $1
+			ORDER BY effective_timestamp DESC
+			LIMIT 1
+		`
+		args = []interface{}{platform}
+	}
 
 	// 3. Execute query
 	var doc domain.PolicyDocument
-	err := r.db.QueryRow(ctx, query, platform, documentName).Scan(
+	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&doc.ID,
 		&doc.DocumentName,
 		&doc.Platform,

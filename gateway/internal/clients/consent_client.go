@@ -80,6 +80,14 @@ func (c *ConsentClient) RevokeConsent(ctx context.Context, req *pb.RevokeConsent
 	return c.client.RevokeConsent(ctx, req)
 }
 
+// GetConsentStats gọi GetConsentStats RPC (Admin only)
+// Giải thích: Lấy thống kê về consents
+func (c *ConsentClient) GetConsentStats(ctx context.Context, req *pb.GetConsentStatsRequest) (*pb.GetConsentStatsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	return c.client.GetConsentStats(ctx, req)
+}
+
 // Close đóng kết nối gRPC
 func (c *ConsentClient) Close() error {
 	if c.conn != nil {

@@ -49,4 +49,5 @@ const (
 const (
 	PlatformClient   = "Client"
 	PlatformMerchant = "Merchant"
+	PlatformAdmin    = "Admin"
 )

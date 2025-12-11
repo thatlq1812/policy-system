@@ -9,10 +9,11 @@ HTTP/REST API Gateway for routing and authenticating requests to gRPC microservi
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Quick Start](#quick-start)
-3. [Environment Variables](#environment-variables)
-4. [API Reference](#api-reference)
-5. [Troubleshooting](#troubleshooting)
+2. [Security](#security)
+3. [Quick Start](#quick-start)
+4. [Environment Variables](#environment-variables)
+5. [API Reference](#api-reference)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -39,6 +40,67 @@ Gateway Service :8080
         |-- Document Service :50051
         +-- Consent Service :50053
 ```
+
+---
+
+## Security
+
+### Admin Account Management
+
+For security reasons, Admin accounts **cannot be created through the public registration API**. This prevents unauthorized users from self-promoting to Admin role.
+
+#### Super Admin Bootstrap
+
+A Super Admin account is created automatically during database initialization:
+
+**Credentials:**
+- Phone: `0900000000`
+- Password: `SuperAdmin@123`
+- Role: `Admin`
+
+**⚠️ IMPORTANT:** Change this password immediately after first login in production environments!
+
+#### Creating Additional Admin Accounts
+
+Only existing Admin users can create new Admin accounts using the admin-only endpoint:
+
+**Endpoint:** `POST /api/v1/admin/create-admin`
+
+**Request:**
+```bash
+curl -X POST http://localhost:8080/api/v1/admin/create-admin \
+  -H "Authorization: Bearer <ADMIN_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone_number": "0902000000",
+    "password": "NewAdmin@123",
+    "name": "Second Admin"
+  }'
+```
+
+**Response:**
+```json
+{
+  "code": "201",
+  "message": "Admin user created successfully",
+  "data": {
+    "user": {
+      "id": "uuid",
+      "phone_number": "0902000000",
+      "name": "Second Admin",
+      "platform_role": "Admin",
+      "created_at": 1733740800
+    }
+  }
+}
+```
+
+**Security Features:**
+- ✅ Admin role blocked from public registration endpoint
+- ✅ Validation at gateway level (HTTP 400)
+- ✅ Explicit security check (HTTP 403)
+- ✅ Admin-only endpoint requires authentication
+- ✅ Only existing Admin can create new Admin accounts
 
 ---
 

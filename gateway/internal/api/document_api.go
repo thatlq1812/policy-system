@@ -21,7 +21,19 @@ func NewDocumentAPI(client *clients.DocumentClient) *DocumentAPI {
 	return &DocumentAPI{client: client}
 }
 
-// CreatePolicy xử lý POST /api/v1/policies
+// CreatePolicy godoc
+// @Summary      Create new policy document
+// @Description  Create a new policy document with version tracking and platform targeting
+// @Tags         Policy Management
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body object{document_name=string,platform=string,is_mandatory=bool,effective_timestamp=int64,content_html=string,file_url=string,created_by=string} true "Policy document details. platform must be one of: Client, Merchant, Admin"
+// @Success      201  {object}  object{code=string,message=string,data=object{id=string,document_name=string,platform=string,is_mandatory=bool,effective_timestamp=int64,content_html=string,file_url=string,created_at=int64,created_by=string}}
+// @Failure      400  {object}  object{code=string,message=string}
+// @Failure      401  {object}  object{code=string,message=string}
+// @Failure      500  {object}  object{code=string,message=string}
+// @Router       /policies [post]
 func (api *DocumentAPI) CreatePolicy(c *gin.Context) {
 	var reqBody struct {
 		DocumentName       string `json:"document_name" binding:"required"`
@@ -78,7 +90,17 @@ func (api *DocumentAPI) CreatePolicy(c *gin.Context) {
 	})
 }
 
-// GetLatestPolicy xử lý GET /api/v1/policies/latest?platform=xxx&document_name=xxx
+// GetLatestPolicy godoc
+// @Summary      Get latest policy document
+// @Description  Retrieve the latest policy document for a specific platform and optional document name
+// @Tags         Policy Management
+// @Produce      json
+// @Param        platform      query  string  true   "Platform (Client, Merchant, Admin)"
+// @Param        document_name query  string  false  "Filter by document name"
+// @Success      200  {object}  object{code=string,message=string,data=object{document=object{id=string,document_name=string,platform=string,is_mandatory=bool,effective_timestamp=int64,content_html=string,file_url=string,created_at=int64}}}
+// @Failure      400  {object}  object{code=string,message=string}
+// @Failure      404  {object}  object{code=string,message=string}
+// @Router       /policies/latest [get]
 func (api *DocumentAPI) GetLatestPolicy(c *gin.Context) {
 	platform := c.Query("platform")
 	documentName := c.Query("document_name")

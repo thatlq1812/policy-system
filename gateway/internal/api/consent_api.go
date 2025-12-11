@@ -21,7 +21,19 @@ func NewConsentAPI(client *clients.ConsentClient) *ConsentAPI {
 	return &ConsentAPI{client: client}
 }
 
-// RecordConsent xử lý POST /api/v1/consents
+// RecordConsent godoc
+// @Summary      Record user consent
+// @Description  Record user consent for one or more policy documents with audit trail
+// @Tags         Consent Management
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body object{user_id=string,platform=string,consents=[]object,consent_method=string,ip_address=string,user_agent=string} true "Consent recording request"
+// @Success      201  {object}  object{code=string,message=string,data=object{consents=[]object,recorded_count=int32}}
+// @Failure      400  {object}  object{code=string,message=string}
+// @Failure      401  {object}  object{code=string,message=string}
+// @Failure      500  {object}  object{code=string,message=string}
+// @Router       /consents [post]
 func (api *ConsentAPI) RecordConsent(c *gin.Context) {
 	var reqBody struct {
 		UserID   string `json:"user_id" binding:"required"`
@@ -110,7 +122,16 @@ func (api *ConsentAPI) RecordConsent(c *gin.Context) {
 	})
 }
 
-// CheckConsent xử lý POST /api/v1/consents/check
+// CheckConsent godoc
+// @Summary      Check user consent status
+// @Description  Check if a user has consented to a specific document and optionally verify minimum version
+// @Tags         Consent Management
+// @Accept       json
+// @Produce      json
+// @Param        request body object{user_id=string,document_id=string,min_version_timestamp=int64} true "Consent check request"
+// @Success      200  {object}  object{code=string,message=string,data=object{has_consented=bool,latest_consent=object}}
+// @Failure      400  {object}  object{code=string,message=string}
+// @Router       /consents/check [post]
 func (api *ConsentAPI) CheckConsent(c *gin.Context) {
 	var reqBody struct {
 		UserID              string `json:"user_id" binding:"required"`
@@ -163,7 +184,18 @@ func (api *ConsentAPI) CheckConsent(c *gin.Context) {
 	})
 }
 
-// GetUserConsents xử lý GET /api/v1/consents/user?user_id=xxx&include_deleted=false
+// GetUserConsents godoc
+// @Summary      Get user's consent history
+// @Description  Retrieve all consent records for a specific user with optional filtering
+// @Tags         Consent Management
+// @Produce      json
+// @Security     BearerAuth
+// @Param        user_id         query  string  true   "User ID"
+// @Param        include_deleted query  bool    false  "Include revoked consents (default: false)"
+// @Success      200  {object}  object{code=string,message=string,data=object{consents=[]object,total_count=int32}}
+// @Failure      400  {object}  object{code=string,message=string}
+// @Failure      401  {object}  object{code=string,message=string}
+// @Router       /consents/user [get]
 func (api *ConsentAPI) GetUserConsents(c *gin.Context) {
 	userID := c.Query("user_id")
 	includeDeleted := c.Query("include_deleted") == "true"
@@ -216,7 +248,16 @@ func (api *ConsentAPI) GetUserConsents(c *gin.Context) {
 	})
 }
 
-// CheckPendingConsents xử lý POST /api/v1/consents/pending
+// CheckPendingConsents godoc
+// @Summary      Check pending consents
+// @Description  Check if user has any mandatory policies that haven't been consented to yet
+// @Tags         Consent Management
+// @Accept       json
+// @Produce      json
+// @Param        request body object{user_id=string,platform=string,latest_policies=[]object} true "Pending consent check request"
+// @Success      200  {object}  object{code=string,message=string,data=object{has_pending=bool,pending_documents=[]object,total_pending=int32}}
+// @Failure      400  {object}  object{code=string,message=string}
+// @Router       /consents/pending [post]
 func (api *ConsentAPI) CheckPendingConsents(c *gin.Context) {
 	var reqBody struct {
 		UserID         string `json:"user_id" binding:"required"`
@@ -283,7 +324,19 @@ func (api *ConsentAPI) CheckPendingConsents(c *gin.Context) {
 	})
 }
 
-// RevokeConsent xử lý POST /api/v1/consents/revoke
+// RevokeConsent godoc
+// @Summary      Revoke user consent
+// @Description  Revoke a previously given consent (GDPR compliance)
+// @Tags         Consent Management
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        request body object{user_id=string,document_id=string,version_timestamp=int64} true "Consent revocation request"
+// @Success      200  {object}  object{code=string,message=string}
+// @Failure      400  {object}  object{code=string,message=string}
+// @Failure      401  {object}  object{code=string,message=string}
+// @Failure      404  {object}  object{code=string,message=string}
+// @Router       /consents/revoke [post]
 func (api *ConsentAPI) RevokeConsent(c *gin.Context) {
 	var reqBody struct {
 		UserID           string `json:"user_id" binding:"required"`

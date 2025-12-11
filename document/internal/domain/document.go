@@ -6,6 +6,7 @@ import "time"
 const (
 	PlatformClient   = "Client"
 	PlatformMerchant = "Merchant"
+	PlatformAdmin    = "Admin"
 )
 
 type PolicyDocument struct {
@@ -32,5 +33,5 @@ type CreateDocumentParams struct {
 
 // Helper function for validation
 func IsValidPlatform(platform string) bool {
-	return platform == PlatformClient || platform == PlatformMerchant
+	return platform == PlatformClient || platform == PlatformMerchant || platform == PlatformAdmin
 }

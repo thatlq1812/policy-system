@@ -1,0 +1,75 @@
+# =============================================================================
+# CONSENT SERVICE - STANDALONE DOCKER COMPOSE
+# =============================================================================
+# Run Consent service independently with local PostgreSQL
+# NOTE: Requires Document Service to be running
+# USAGE: docker-compose -f docker-compose.standalone.yml up -d
+
+version: '3.9'
+
+services:
+  # PostgreSQL for Consent Service
+  postgres:
+    image: postgres:18-alpine
+    container_name: consent_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: consent_db
+    ports:
+      - "5435:5432" # Use different port to avoid conflicts
+    volumes:
+      - consent_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Migration
+  migrate:
+    image: migrate/migrate
+    container_name: consent_migrate
+    restart: on-failure
+    volumes:
+      - ./migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Consent Service
+  consent_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: consent_service_standalone
+    restart: unless-stopped
+    ports:
+      - "50053:50053"
+    environment:
+      GRPC_PORT: 50053
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable
+      DOCUMENT_SERVICE_URL: ${DOCUMENT_SERVICE_URL:-host.docker.internal:50051}
+      LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "50053" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    network_mode: bridge
+
+volumes:
+  consent_postgres_data:
+
+    # NOTE: This service requires Document Service to be running
+    # Set DOCUMENT_SERVICE_URL environment variable if not using default

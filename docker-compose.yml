@@ -1,17 +1,32 @@
 version: '3.9'
 
+# =============================================================================
+# POLICY & CONSENT MANAGEMENT SYSTEM - DOCKER COMPOSE
+# =============================================================================
+# Complete microservices stack with PostgreSQL and migrations
+# Services: Gateway (HTTP), User, Document, Consent (gRPC)
+#
+# USAGE:
+#   Development: docker-compose up -d
+#   Production:  docker-compose -f docker-compose.yml up -d
+#   Stop:        docker-compose down
+#   Clean:       docker-compose down -v (removes volumes)
+# =============================================================================
+
 services:
-  # PostgreSQL Server (shared)
+  # ===========================================================================
+  # DATABASE - PostgreSQL 18
+  # ===========================================================================
   postgres:
-    restart: unless-stopped
     image: postgres:18-alpine
     container_name: policy_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres # Default DB
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-databases.sql:/docker-entrypoint-initdb.d/init.sql
@@ -23,132 +38,201 @@ services:
     networks:
       - policy_network
 
-  # Document Service
+  # ===========================================================================
+  # DATABASE MIGRATIONS
+  # ===========================================================================
+
+  # Document DB Migration
+  document_migrate:
+    image: migrate/migrate
+    container_name: document_migrate
+    restart: on-failure
+    volumes:
+      - ./document/migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=${DOCUMENT_DB_URL:-postgres://postgres:postgres@postgres:5432/document_db?sslmode=disable}"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # User DB Migration
+  user_migrate:
+    image: migrate/migrate
+    container_name: user_migrate
+    restart: on-failure
+    volumes:
+      - ./user/migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=${USER_DB_URL:-postgres://postgres:postgres@postgres:5432/user_db?sslmode=disable}"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # Consent DB Migration
+  consent_migrate:
+    image: migrate/migrate
+    container_name: consent_migrate
+    restart: on-failure
+    volumes:
+      - ./consent/migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=${CONSENT_DB_URL:-postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable}"
+      - "up"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - policy_network
+
+  # ===========================================================================
+  # MICROSERVICES
+  # ===========================================================================
+
+  # Document Service (gRPC - Port 50051)
   document_service:
-    restart: unless-stopped
     build:
       context: .
       dockerfile: document/Dockerfile
     container_name: document_service
-    environment:
-      GRPC_PORT: 50051
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/document_db?sslmode=disable
-      DB_MAX_CONN: 10
-    ports:
-      - "50051:50051"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - policy_network
-
-  # Document migrate:
-  document_migrate:
-    restart: no
-    image: migrate/migrate
-    container_name: document_migrate
-    volumes:
-      - ./document/migrations:/migrations
-    command: [ "-path", "/migrations", "-database", "postgres://postgres:postgres@postgres:5432/document_db?sslmode=disable", "up" ]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - policy_network
-
-  # User Service
-  user_service:
     restart: unless-stopped
+    environment:
+      GRPC_PORT: ${DOCUMENT_SERVICE_PORT:-50051}
+      DATABASE_URL: ${DOCUMENT_DB_URL:-postgres://postgres:postgres@postgres:5432/document_db?sslmode=disable}
+      LOG_LEVEL: info
+      DB_MAX_OPEN_CONNS: 25
+      DB_MAX_IDLE_CONNS: 5
+    ports:
+      - "${DOCUMENT_SERVICE_PORT:-50051}:50051"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      document_migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "50051" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - policy_network
+
+  # User Service (gRPC - Port 50052)
+  user_service:
     build:
       context: .
       dockerfile: user/Dockerfile
     container_name: user_service
-    env_file:
-      - user/.env
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/user_db?sslmode=disable
-    ports:
-      - "50052:50052"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - policy_network
-
-  # User migrate:
-  user_migrate:
-    restart: no
-    image: migrate/migrate
-    container_name: user_migrate
-    volumes:
-      - ./user/migrations:/migrations
-    command: [ "-path", "/migrations", "-database", "postgres://postgres:postgres@postgres:5432/user_db?sslmode=disable", "up" ]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - policy_network
-
-  # Consent Service
-  consent_service:
     restart: unless-stopped
+    environment:
+      GRPC_PORT: ${USER_SERVICE_PORT:-50052}
+      DATABASE_URL: ${USER_DB_URL:-postgres://postgres:postgres@postgres:5432/user_db?sslmode=disable}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-key-change-this-in-production}
+      JWT_ACCESS_TOKEN_DURATION: ${JWT_ACCESS_TOKEN_DURATION:-15m}
+      JWT_REFRESH_TOKEN_DURATION: ${JWT_REFRESH_TOKEN_DURATION:-168h}
+      LOG_LEVEL: info
+      DB_MAX_OPEN_CONNS: 25
+      DB_MAX_IDLE_CONNS: 5
+    ports:
+      - "${USER_SERVICE_PORT:-50052}:50052"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      user_migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "50052" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - policy_network
+
+  # Consent Service (gRPC - Port 50053)
+  consent_service:
     build:
       context: .
       dockerfile: consent/Dockerfile
     container_name: consent_service
-    env_file:
-      - consent/.env
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable
+      GRPC_PORT: ${CONSENT_SERVICE_PORT:-50053}
+      DATABASE_URL: ${CONSENT_DB_URL:-postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable}
       DOCUMENT_SERVICE_URL: document_service:50051
+      LOG_LEVEL: info
+      DB_MAX_OPEN_CONNS: 25
+      DB_MAX_IDLE_CONNS: 5
     ports:
-      - "50053:50053"
+      - "${CONSENT_SERVICE_PORT:-50053}:50053"
     depends_on:
       postgres:
         condition: service_healthy
+      consent_migrate:
+        condition: service_completed_successfully
       document_service:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "nc", "-z", "localhost", "50053" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - policy_network
 
-  # Consent migrate
-  consent_migrate:
-    restart: no
-    image: migrate/migrate
-    container_name: consent_migrate
-    volumes:
-      - ./consent/migrations:/migrations
-    command: [ "-path", "/migrations", "-database", "postgres://postgres:postgres@postgres:5432/consent_db?sslmode=disable", "up" ]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - policy_network
-  # API Gateway
+  # Gateway Service (HTTP/REST - Port 8080)
   gateway:
-    restart: unless-stopped
     build:
       context: .
       dockerfile: gateway/Dockerfile
     container_name: api_gateway
+    restart: unless-stopped
     environment:
-      SERVER_PORT: 8080
+      SERVER_PORT: ${GATEWAY_PORT:-8080}
       USER_SERVICE_ADDR: user_service:50052
       DOCUMENT_SERVICE_ADDR: document_service:50051
       CONSENT_SERVICE_ADDR: consent_service:50053
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-key-change-this-in-production}
+      JWT_ACCESS_TOKEN_DURATION: ${JWT_ACCESS_TOKEN_DURATION:-15m}
+      JWT_REFRESH_TOKEN_DURATION: ${JWT_REFRESH_TOKEN_DURATION:-168h}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
+      ALLOWED_CREDENTIALS: ${ALLOWED_CREDENTIALS:-true}
+      LOG_LEVEL: info
+      GRPC_TIMEOUT: 10
     ports:
-      - "8080:8080"
+      - "${GATEWAY_PORT:-8080}:8080"
     depends_on:
-      - user_service
-      - document_service
-      - consent_service
+      user_service:
+        condition: service_healthy
+      document_service:
+        condition: service_healthy
+      consent_service:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - policy_network
 
+# =============================================================================
+# VOLUMES
+# =============================================================================
 volumes:
   postgres_data:
+    driver: local
 
-
+# =============================================================================
+# NETWORKS
+# =============================================================================
 networks:
   policy_network:
     driver: bridge

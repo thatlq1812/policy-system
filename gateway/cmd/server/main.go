@@ -11,12 +11,35 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/thatlq1812/policy-system/gateway/configs"
 	"github.com/thatlq1812/policy-system/gateway/internal/api"
 	"github.com/thatlq1812/policy-system/gateway/internal/clients"
 	"github.com/thatlq1812/policy-system/gateway/internal/middleware"
+
+	_ "github.com/thatlq1812/policy-system/gateway/docs" // swagger docs
 )
+
+// @title           Policy & Consent Management API Gateway
+// @version         1.0
+// @description     HTTP/REST API Gateway for Policy & Consent Management System. Provides authentication, user management, document management, and consent tracking.
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.email  support@example.com
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
 	// 1. Load configuration từ environment variables
@@ -43,9 +66,14 @@ func main() {
 	defer consentClient.Close()
 
 	// 3. Initialize API handlers
-	userAPI := api.NewUserAPI(userClient)
+	// Giải thích: UserAPI cần access cả 3 clients để làm orchestration
+	// - userClient: Register/Delete user
+	// - documentClient: Get policies
+	// - consentClient: Record consent
+	userAPI := api.NewUserAPI(userClient, documentClient, consentClient)
 	documentAPI := api.NewDocumentAPI(documentClient)
 	consentAPI := api.NewConsentAPI(consentClient)
+	adminAPI := api.NewAdminAPI(consentClient) // Admin endpoints
 
 	// 4. Setup Gin router
 	// Set Gin mode based on environment
@@ -83,12 +111,20 @@ func main() {
 		})
 	})
 
+	// Swagger documentation
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// Public routes (no authentication required)
 	public := router.Group("/api/v1")
 	{
 		// Authentication
-		public.POST("/auth/register", userAPI.Register)
-		public.POST("/auth/login", userAPI.Login)
+		// Giải thích: Dùng enhanced versions với orchestration
+		// - RegisterWithConsent: Register + Auto-consent orchestration (có rollback)
+		// - LoginWithPendingCheck: Login + Check pending consents (graceful degradation)
+		public.POST("/auth/register", userAPI.RegisterWithConsent)
+		public.POST("/auth/login", userAPI.LoginWithPendingCheck)
+		public.POST("/auth/refresh", userAPI.RefreshToken) // Token refresh
+		public.POST("/auth/logout", userAPI.Logout)        // Logout
 
 		// Documents (public access)
 		public.POST("/policies", documentAPI.CreatePolicy)
@@ -99,12 +135,30 @@ func main() {
 	protected := router.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
 	{
+		// User endpoints
+		protected.POST("/user/change-password", userAPI.ChangePassword)
+
 		// Consent endpoints
 		protected.POST("/consents", consentAPI.RecordConsent)
 		protected.POST("/consents/check", consentAPI.CheckConsent)
 		protected.GET("/consents/user", consentAPI.GetUserConsents)
 		protected.POST("/consents/pending", consentAPI.CheckPendingConsents)
 		protected.POST("/consents/revoke", consentAPI.RevokeConsent)
+	}
+
+	// Admin routes (require JWT + Admin role)
+	// TODO: Add role-based authorization middleware
+	admin := router.Group("/api/v1/admin")
+	admin.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	// admin.Use(middleware.RequireRole("Admin")) // TODO: Implement role check
+	{
+		// User management
+		admin.GET("/users", userAPI.ListUsers)
+		admin.GET("/stats/users", userAPI.GetUserStats)
+		admin.POST("/create-admin", userAPI.CreateAdminUser) // Admin-only: Create new admin accounts
+
+		// Consent statistics
+		admin.GET("/stats/consents", adminAPI.GetConsentStats)
 	}
 
 	// 7. Create HTTP server

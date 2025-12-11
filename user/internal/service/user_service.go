@@ -558,8 +558,8 @@ func (s *userService) validateRegisterInput(phoneNumber, password, platformRole 
 		return fmt.Errorf("password must be at least 6 characters")
 	}
 
-	if platformRole != "Client" && platformRole != "Merchant" {
-		return fmt.Errorf("platform_role must be either 'Client' or 'Merchant'")
+	if platformRole != "Client" && platformRole != "Merchant" && platformRole != "Admin" {
+		return fmt.Errorf("platform_role must be one of: 'Client', 'Merchant', or 'Admin'")
 	}
 
 	return nil

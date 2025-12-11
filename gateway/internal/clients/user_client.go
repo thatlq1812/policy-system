@@ -58,6 +58,55 @@ func (c *UserClient) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Login
 	return c.client.Login(ctx, req)
 }
 
+// DeleteUser gọi DeleteUser RPC (for rollback scenarios)
+// Giải thích: Dùng để xóa user khi registration orchestration fails
+// Ví dụ: User tạo thành công nhưng consent failed → Rollback bằng DeleteUser
+func (c *UserClient) DeleteUser(ctx context.Context, req *pb.DeleteUserRequest) (*pb.DeleteUserResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	return c.client.DeleteUser(ctx, req)
+}
+
+// RefreshToken gọi RefreshToken RPC
+// Giải thích: Dùng refresh token để lấy access token mới
+func (c *UserClient) RefreshToken(ctx context.Context, req *pb.RefreshTokenRequest) (*pb.RefreshTokenResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	return c.client.RefreshToken(ctx, req)
+}
+
+// Logout gọi Logout RPC
+// Giải thích: Thu hồi refresh token khi user logout
+func (c *UserClient) Logout(ctx context.Context, req *pb.LogoutRequest) (*pb.LogoutResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	return c.client.Logout(ctx, req)
+}
+
+// ChangePassword gọi ChangePassword RPC
+// Giải thích: Thay đổi password của user
+func (c *UserClient) ChangePassword(ctx context.Context, req *pb.ChangePasswordRequest) (*pb.ChangePasswordResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	return c.client.ChangePassword(ctx, req)
+}
+
+// ListUsers gọi ListUsers RPC (Admin only)
+// Giải thích: Lấy danh sách users với pagination
+func (c *UserClient) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	return c.client.ListUsers(ctx, req)
+}
+
+// GetUserStats gọi GetUserStats RPC (Admin only)
+// Giải thích: Lấy thống kê về users
+func (c *UserClient) GetUserStats(ctx context.Context, req *pb.GetUserStatsRequest) (*pb.GetUserStatsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	return c.client.GetUserStats(ctx, req)
+}
+
 // Close đóng kết nối gRPC
 func (c *UserClient) Close() error {
 	if c.conn != nil {
