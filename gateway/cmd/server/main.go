@@ -2,13 +2,15 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 
 	"github.com/thatlq1812/policy-system/gateway/configs"
 	"github.com/thatlq1812/policy-system/gateway/internal/api"
@@ -21,20 +23,20 @@ func main() {
 	cfg := configs.Load()
 	log.Printf("Starting API Gateway on port %d", cfg.Server.Port)
 
-	// 2. Initialize gRPC clients
-	userClient, err := clients.NewUserClient(cfg.Services.UserServiceAddr)
+	// 2. Initialize gRPC clients với timeout
+	userClient, err := clients.NewUserClient(cfg.Services.UserServiceAddr, cfg.GRPCcallTimeout)
 	if err != nil {
 		log.Fatalf("Failed to create user client: %v", err)
 	}
 	defer userClient.Close()
 
-	documentClient, err := clients.NewDocumentClient(cfg.Services.DocumentServiceAddr)
+	documentClient, err := clients.NewDocumentClient(cfg.Services.DocumentServiceAddr, cfg.GRPCcallTimeout)
 	if err != nil {
 		log.Fatalf("Failed to create document client: %v", err)
 	}
 	defer documentClient.Close()
 
-	consentClient, err := clients.NewConsentClient(cfg.Services.ConsentServiceAddr)
+	consentClient, err := clients.NewConsentClient(cfg.Services.ConsentServiceAddr, cfg.GRPCcallTimeout)
 	if err != nil {
 		log.Fatalf("Failed to create consent client: %v", err)
 	}
@@ -45,51 +47,92 @@ func main() {
 	documentAPI := api.NewDocumentAPI(documentClient)
 	consentAPI := api.NewConsentAPI(consentClient)
 
-	// 4. Setup HTTP router
-	mux := http.NewServeMux()
+	// 4. Setup Gin router
+	// Set Gin mode based on environment
+	if cfg.LogLevel == "debug" {
+		gin.SetMode(gin.DebugMode)
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
-	// Health check endpoint
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status":"ok","service":"api-gateway"}`))
+	router := gin.New()
+
+	// 5. Apply global middleware
+	// CORS must be first
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     cfg.AllowedOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Request-ID"},
+		ExposeHeaders:    []string{"Content-Length", "X-Request-ID"},
+		AllowCredentials: cfg.AllowedCredentials,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	// Custom logger middleware
+	router.Use(middleware.GinLogger())
+
+	// Recovery middleware
+	router.Use(gin.Recovery())
+
+	// 6. Register routes
+	// Health check
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":  "ok",
+			"service": "api-gateway",
+		})
 	})
 
-	// Register API routes
-	userAPI.RegisterRoutes(mux)
-	documentAPI.RegisterRoutes(mux)
-	consentAPI.RegisterRoutes(mux)
+	// Public routes (no authentication required)
+	public := router.Group("/api/v1")
+	{
+		// Authentication
+		public.POST("/auth/register", userAPI.Register)
+		public.POST("/auth/login", userAPI.Login)
 
-	// 5. Apply middleware
-	// Thứ tự middleware: Logger (ngoài cùng) -> Auth -> Handler
-	handler := middleware.Logger(mux)
+		// Documents (public access)
+		public.POST("/policies", documentAPI.CreatePolicy)
+		public.GET("/policies/latest", documentAPI.GetLatestPolicy)
+	}
 
-	// 6. Create HTTP server
+	// Protected routes (require JWT authentication)
+	protected := router.Group("/api/v1")
+	protected.Use(middleware.AuthMiddleware(cfg.JWT.Secret))
+	{
+		// Consent endpoints
+		protected.POST("/consents", consentAPI.RecordConsent)
+		protected.POST("/consents/check", consentAPI.CheckConsent)
+		protected.GET("/consents/user", consentAPI.GetUserConsents)
+		protected.POST("/consents/pending", consentAPI.CheckPendingConsents)
+		protected.POST("/consents/revoke", consentAPI.RevokeConsent)
+	}
+
+	// 7. Create HTTP server
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      handler,
+		Addr:         cfg.Server.GetAddr(),
+		Handler:      router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// 7. Graceful shutdown setup
-	// Channel để nhận signal từ OS
+	// 8. Graceful shutdown setup
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	// Chạy server trong goroutine
+	// Start server
 	go func() {
-		log.Printf("API Gateway listening on :%d", cfg.Server.Port)
+		log.Printf("API Gateway listening on %s", cfg.Server.GetAddr())
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}
 	}()
 
-	// 8. Chờ signal shutdown
+	// Wait for shutdown signal
 	<-quit
 	log.Println("Shutting down API Gateway...")
 
-	// Graceful shutdown với timeout
+	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

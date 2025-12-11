@@ -14,18 +14,18 @@ import (
 
 // DocumentClient là wrapper cho gRPC document service client
 type DocumentClient struct {
-	conn   *grpc.ClientConn
-	client pb.DocumentServiceClient
+	conn    *grpc.ClientConn
+	client  pb.DocumentServiceClient
+	timeout time.Duration
 }
 
 // NewDocumentClient tạo kết nối tới Document Service
-func NewDocumentClient(addr string) (*DocumentClient, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, addr,
+// addr: địa chỉ service (vd: "localhost:50051")
+// timeout: thời gian timeout cho mỗi gRPC call
+func NewDocumentClient(addr string, timeout time.Duration) (*DocumentClient, error) {
+	// Tạo gRPC connection với NewClient (non-deprecated)
+	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to document service at %s: %w", addr, err)
@@ -34,18 +34,25 @@ func NewDocumentClient(addr string) (*DocumentClient, error) {
 	log.Printf("Connected to Document Service at %s", addr)
 
 	return &DocumentClient{
-		conn:   conn,
-		client: pb.NewDocumentServiceClient(conn),
+		conn:    conn,
+		client:  pb.NewDocumentServiceClient(conn),
+		timeout: timeout,
 	}, nil
 }
 
 // CreatePolicy gọi CreatePolicy RPC
+// Tự động add timeout vào context
 func (c *DocumentClient) CreatePolicy(ctx context.Context, req *pb.CreateDocumentRequest) (*pb.CreateDocumentResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	return c.client.CreatePolicy(ctx, req)
 }
 
 // GetLatestPolicy gọi GetLatestPolicyByPlatform RPC
+// Tự động add timeout vào context
 func (c *DocumentClient) GetLatestPolicy(ctx context.Context, req *pb.GetLatestPolicyRequest) (*pb.GetLatestPolicyResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	return c.client.GetLatestPolicyByPlatform(ctx, req)
 }
 

@@ -14,18 +14,18 @@ import (
 
 // ConsentClient là wrapper cho gRPC consent service client
 type ConsentClient struct {
-	conn   *grpc.ClientConn
-	client pb.ConsentServiceClient
+	conn    *grpc.ClientConn
+	client  pb.ConsentServiceClient
+	timeout time.Duration
 }
 
 // NewConsentClient tạo kết nối tới Consent Service
-func NewConsentClient(addr string) (*ConsentClient, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	conn, err := grpc.DialContext(ctx, addr,
+// addr: địa chỉ service (vd: "localhost:50053")
+// timeout: thời gian timeout cho mỗi gRPC call
+func NewConsentClient(addr string, timeout time.Duration) (*ConsentClient, error) {
+	// Tạo gRPC connection với NewClient (non-deprecated)
+	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to consent service at %s: %w", addr, err)
@@ -34,33 +34,49 @@ func NewConsentClient(addr string) (*ConsentClient, error) {
 	log.Printf("Connected to Consent Service at %s", addr)
 
 	return &ConsentClient{
-		conn:   conn,
-		client: pb.NewConsentServiceClient(conn),
+		conn:    conn,
+		client:  pb.NewConsentServiceClient(conn),
+		timeout: timeout,
 	}, nil
 }
 
 // RecordConsent gọi RecordConsent RPC
+// Tự động add timeout vào context
 func (c *ConsentClient) RecordConsent(ctx context.Context, req *pb.RecordConsentRequest) (*pb.RecordConsentResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	return c.client.RecordConsent(ctx, req)
 }
 
 // CheckConsent gọi CheckConsent RPC
+// Tự động add timeout vào context
 func (c *ConsentClient) CheckConsent(ctx context.Context, req *pb.CheckConsentRequest) (*pb.CheckConsentResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	return c.client.CheckConsent(ctx, req)
 }
 
 // GetUserConsents gọi GetUserConsents RPC
+// Tự động add timeout vào context
 func (c *ConsentClient) GetUserConsents(ctx context.Context, req *pb.GetUserConsentsRequest) (*pb.GetUserConsentsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	return c.client.GetUserConsents(ctx, req)
 }
 
 // CheckPendingConsents gọi CheckPendingConsents RPC
+// Tự động add timeout vào context
 func (c *ConsentClient) CheckPendingConsents(ctx context.Context, req *pb.CheckPendingConsentsRequest) (*pb.CheckPendingConsentsResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	return c.client.CheckPendingConsents(ctx, req)
 }
 
 // RevokeConsent gọi RevokeConsent RPC
+// Tự động add timeout vào context
 func (c *ConsentClient) RevokeConsent(ctx context.Context, req *pb.RevokeConsentRequest) (*pb.RevokeConsentResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
 	return c.client.RevokeConsent(ctx, req)
 }
 

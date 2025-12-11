@@ -2,52 +2,46 @@ package middleware
 
 import (
 	"log"
-	"net/http"
 	"time"
+
+	"github.com/gin-gonic/gin"
 )
 
-// responseWriter wrapper để capture status code
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-	written    int64
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
-}
-
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	n, err := rw.ResponseWriter.Write(b)
-	rw.written += int64(n)
-	return n, err
-}
-
-// Logger middleware ghi log cho mỗi request
-func Logger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// GinLogger middleware ghi log cho mỗi request
+func GinLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		start := time.Now()
+		path := c.Request.URL.Path
+		raw := c.Request.URL.RawQuery
 
-		// Wrap response writer để capture status code
-		wrapped := &responseWriter{
-			ResponseWriter: w,
-			statusCode:     http.StatusOK, // Default status
+		// Process request
+		c.Next()
+
+		// Log after request completes
+		timestamp := time.Now()
+		latency := timestamp.Sub(start)
+		clientIP := c.ClientIP()
+		method := c.Request.Method
+		statusCode := c.Writer.Status()
+		errorMessage := c.Errors.ByType(gin.ErrorTypePrivate).String()
+		bodySize := c.Writer.Size()
+
+		if raw != "" {
+			path = path + "?" + raw
 		}
 
-		// Gọi handler tiếp theo
-		next.ServeHTTP(wrapped, r)
-
-		// Log sau khi request hoàn thành
-		duration := time.Since(start)
-		log.Printf(
-			"[%s] %s %s - Status: %d - Duration: %v - Size: %d bytes",
-			r.Method,
-			r.URL.Path,
-			r.RemoteAddr,
-			wrapped.statusCode,
-			duration,
-			wrapped.written,
+		log.Printf("[GIN] %v | %3d | %13v | %15s | %-7s %s %s",
+			timestamp.Format("2006/01/02 - 15:04:05"),
+			statusCode,
+			latency,
+			clientIP,
+			method,
+			path,
+			errorMessage,
 		)
-	})
+
+		if bodySize > 0 {
+			log.Printf("[GIN] Response Size: %d bytes", bodySize)
+		}
+	}
 }

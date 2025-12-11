@@ -1,12 +1,12 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/thatlq1812/policy-system/gateway/internal/clients"
 	"github.com/thatlq1812/policy-system/gateway/internal/middleware"
-	"github.com/thatlq1812/policy-system/gateway/internal/response"
 
 	pb "github.com/thatlq1812/policy-system/shared/pkg/api/user"
 )
@@ -21,28 +21,20 @@ func NewUserAPI(client *clients.UserClient) *UserAPI {
 	return &UserAPI{client: client}
 }
 
-// RegisterRoutes đăng ký các routes cho user
-func (api *UserAPI) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/auth/register", api.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", api.Login)
-}
-
 // Register xử lý POST /api/v1/auth/register
-func (api *UserAPI) Register(w http.ResponseWriter, r *http.Request) {
+func (api *UserAPI) Register(c *gin.Context) {
 	var reqBody struct {
-		PhoneNumber  string `json:"phone_number"`
-		Password     string `json:"password"`
-		Name         string `json:"name"`
-		PlatformRole string `json:"platform_role"`
+		PhoneNumber  string `json:"phone_number" binding:"required"`
+		Password     string `json:"password" binding:"required,min=6"`
+		Name         string `json:"name" binding:"required"`
+		PlatformRole string `json:"platform_role" binding:"required,oneof=Client Merchant Admin"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
-		return
-	}
-
-	if reqBody.PhoneNumber == "" || reqBody.Password == "" || reqBody.Name == "" {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "phone_number, password, and name are required")
+	if err := c.ShouldBindJSON(&reqBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "400",
+			"message": err.Error(),
+		})
 		return
 	}
 
@@ -53,44 +45,47 @@ func (api *UserAPI) Register(w http.ResponseWriter, r *http.Request) {
 		PlatformRole: reqBody.PlatformRole,
 	}
 
-	grpcResp, err := api.client.Register(r.Context(), grpcReq)
+	grpcResp, err := api.client.Register(c.Request.Context(), grpcReq)
 	if err != nil {
 		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
-		response.Error(w, statusCode, code, msg)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 
-	data := map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":            grpcResp.User.Id,
-			"phone_number":  grpcResp.User.PhoneNumber,
-			"name":          grpcResp.User.Name,
-			"platform_role": grpcResp.User.PlatformRole,
-			"created_at":    grpcResp.User.CreatedAt,
+	c.JSON(http.StatusCreated, gin.H{
+		"code":    "201",
+		"message": "Registration successful",
+		"data": gin.H{
+			"user": gin.H{
+				"id":            grpcResp.User.Id,
+				"phone_number":  grpcResp.User.PhoneNumber,
+				"name":          grpcResp.User.Name,
+				"platform_role": grpcResp.User.PlatformRole,
+				"created_at":    grpcResp.User.CreatedAt,
+			},
+			"access_token":             grpcResp.AccessToken,
+			"refresh_token":            grpcResp.RefreshToken,
+			"access_token_expires_at":  grpcResp.AccessTokenExpiresAt,
+			"refresh_token_expires_at": grpcResp.RefreshTokenExpiresAt,
 		},
-		"access_token":             grpcResp.AccessToken,
-		"refresh_token":            grpcResp.RefreshToken,
-		"access_token_expires_at":  grpcResp.AccessTokenExpiresAt,
-		"refresh_token_expires_at": grpcResp.RefreshTokenExpiresAt,
-	}
-
-	response.Success(w, data)
+	})
 }
 
 // Login xử lý POST /api/v1/auth/login
-func (api *UserAPI) Login(w http.ResponseWriter, r *http.Request) {
+func (api *UserAPI) Login(c *gin.Context) {
 	var reqBody struct {
-		PhoneNumber string `json:"phone_number"`
-		Password    string `json:"password"`
+		PhoneNumber string `json:"phone_number" binding:"required"`
+		Password    string `json:"password" binding:"required"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "Invalid request body")
-		return
-	}
-
-	if reqBody.PhoneNumber == "" || reqBody.Password == "" {
-		response.Error(w, http.StatusBadRequest, response.CodeBadRequest, "phone_number and password are required")
+	if err := c.ShouldBindJSON(&reqBody); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "400",
+			"message": err.Error(),
+		})
 		return
 	}
 
@@ -99,25 +94,30 @@ func (api *UserAPI) Login(w http.ResponseWriter, r *http.Request) {
 		Password:    reqBody.Password,
 	}
 
-	grpcResp, err := api.client.Login(r.Context(), grpcReq)
+	grpcResp, err := api.client.Login(c.Request.Context(), grpcReq)
 	if err != nil {
 		statusCode, code, msg := middleware.GrpcErrorToHTTP(err)
-		response.Error(w, statusCode, code, msg)
+		c.JSON(statusCode, gin.H{
+			"code":    code,
+			"message": msg,
+		})
 		return
 	}
 
-	data := map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":            grpcResp.User.Id,
-			"phone_number":  grpcResp.User.PhoneNumber,
-			"name":          grpcResp.User.Name,
-			"platform_role": grpcResp.User.PlatformRole,
+	c.JSON(http.StatusOK, gin.H{
+		"code":    "200",
+		"message": "Login successful",
+		"data": gin.H{
+			"user": gin.H{
+				"id":            grpcResp.User.Id,
+				"phone_number":  grpcResp.User.PhoneNumber,
+				"name":          grpcResp.User.Name,
+				"platform_role": grpcResp.User.PlatformRole,
+			},
+			"access_token":             grpcResp.AccessToken,
+			"refresh_token":            grpcResp.RefreshToken,
+			"access_token_expires_at":  grpcResp.AccessTokenExpiresAt,
+			"refresh_token_expires_at": grpcResp.RefreshTokenExpiresAt,
 		},
-		"access_token":             grpcResp.AccessToken,
-		"refresh_token":            grpcResp.RefreshToken,
-		"access_token_expires_at":  grpcResp.AccessTokenExpiresAt,
-		"refresh_token_expires_at": grpcResp.RefreshTokenExpiresAt,
-	}
-
-	response.Success(w, data)
+	})
 }
